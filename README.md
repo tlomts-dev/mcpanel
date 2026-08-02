@@ -28,7 +28,7 @@
 ## التثبيت
 
 ```bash
-git clone <رابط-المستودع> panel
+git clone https://github.com/tlomts-dev/mcpanel panel
 cd panel
 npm install
 cp .env.example .env
