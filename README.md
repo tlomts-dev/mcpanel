@@ -91,6 +91,8 @@ panel/
 └── public/
     └── index.html      واجهة اللوحة (HTML وCSS وJS في ملف واحد)
 ```
+![لقطة من اللوحة](screenshots/s182010.png)
+
 
 ## ملاحظات أمنية
 
