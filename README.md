@@ -94,12 +94,9 @@ panel/
 
 ## لقطات الشاشة
 
-![لقطة من اللوحة](screenshots/s182010.png)
-![لقطة من اللوحة](screenshots/s182029.png)
-![لقطة من اللوحة](screenshots/s182048.png)
-![لقطة من اللوحة](screenshots/s182058.png)
-![لقطة من اللوحة](screenshots/s182110.png)
-![لقطة من اللوحة](screenshots/s182132.png)
+![لقطة من اللوحة](screenshots/s182010.png) ![لقطة من اللوحة](screenshots/s182029.png)
+![لقطة من اللوحة](screenshots/s182048.png) ![لقطة من اللوحة](screenshots/s182058.png)
+![لقطة من اللوحة](screenshots/s182110.png) ![لقطة من اللوحة](screenshots/s182132.png)
 ![لقطة من اللوحة](screenshots/s182145.png)
 
 ## ملاحظات أمنية
