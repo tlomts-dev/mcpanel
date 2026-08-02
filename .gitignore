@@ -1,0 +1,6 @@
+node_modules/
+.env
+*.log
+.panel-startup.json
+.mc-panel.log
+backups/

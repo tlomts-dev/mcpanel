@@ -1,0 +1,22 @@
+{
+  "name": "mc-panel",
+  "version": "1.0.0",
+  "description": "لوحة تحكم ويب لإدارة سيرفر Minecraft (تشغيل/إيقاف، كونسول مباشر، إدارة لاعبين، ملفات، نسخ احتياطية)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.2",
+    "express-session": "^1.19.0",
+    "unzipper": "^0.12.5",
+    "ws": "^8.21.1"
+  },
+  "license": "MIT"
+}

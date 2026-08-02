@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MC Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080a0d;--surface:#0e1117;--surface2:#141920;--surface3:#1a2130;
+  --border:#1e2a38;--border2:#263344;
+  --accent:#00e87a;--accent2:#38bdf8;--accent3:#818cf8;
+  --danger:#f43f5e;--warn:#f59e0b;--info:#06b6d4;
+  --text:#cbd5e1;--text2:#94a3b8;--muted:#475569;--muted2:#1e2d3d;
+  --radius:6px;--num-color:#fff;
+}
+body.light-mode{
+  --bg:#f0f2f5;--surface:#ffffff;--surface2:#f5f7fa;--surface3:#eef0f3;
+  --border:#d1d9e0;--border2:#b0bec5;
+  --text:#1e293b;--text2:#475569;--muted:#64748b;--muted2:#e2e8f0;--num-color:#1e293b;
+}
+body.light-mode .log-area{background:#f8fafc;color:#334155;}
+body.light-mode textarea.editor{background:#f8fafc;color:#1e40af;}
+body.light-mode .cmd-row input{background:#f5f7fa;color:#1e293b;}
+body.light-mode .inp{background:#f5f7fa;}
+body.light-mode select.sel{background:#f5f7fa;}
+body.light-mode #login-screen{background:radial-gradient(ellipse at 50% -20%,#00e87a18 0%,transparent 65%);}
+body.light-mode .login-box input{background:#f0f2f5;}
+body.light-mode .console-search input{background:#f5f7fa;color:var(--text);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Tajawal',sans-serif;min-height:100vh;overflow-x:hidden;}
+
+/* ── Login ── */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% -20%,#00e87a12 0%,transparent 65%);}
+.login-box{background:var(--surface);border:1px solid var(--border);padding:48px 40px;width:380px;border-radius:10px;box-shadow:0 32px 80px #00000099;}
+.login-logo{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--accent);letter-spacing:3px;margin-bottom:4px;opacity:.7;}
+.login-box h1{font-size:30px;font-weight:900;color:var(--num-color);margin-bottom:4px;}
+.login-box p{color:var(--muted);font-size:14px;margin-bottom:32px;}
+.login-box input{width:100%;background:#060810;border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:var(--radius);font-size:15px;font-family:'Tajawal',sans-serif;margin-bottom:12px;outline:none;transition:.2s;direction:ltr;}
+.login-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #00e87a12;}
+.btn-login{width:100%;background:var(--accent);color:#000;border:none;padding:13px;font-size:16px;font-weight:700;font-family:'Tajawal',sans-serif;border-radius:var(--radius);cursor:pointer;transition:.15s;}
+.btn-login:hover{filter:brightness(1.08);}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;}
+.login-err{color:var(--danger);font-size:13px;margin-top:10px;display:none;}
+
+/* ── Panel shell ── */
+#panel{display:none;min-height:100vh;flex-direction:column;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;gap:12px;}
+.logo{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--accent);white-space:nowrap;}
+.logo span{color:var(--muted);font-weight:400;}
+.hdr-center{display:flex;align-items:center;gap:10px;flex:1;justify-content:center;min-width:0;}
+.hdr-version{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:3px;white-space:nowrap;display:none;}
+.hdr-stats{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+.hdr-stat{display:flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);padding:3px 9px;border-radius:3px;white-space:nowrap;}
+.hdr-stat-dot{width:5px;height:5px;border-radius:50%;background:var(--muted);}
+.hdr-stat-dot.green{background:var(--accent);}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.status-pill{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);padding:5px 12px;border-radius:20px;font-size:12px;font-family:'IBM Plex Mono',monospace;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);flex-shrink:0;transition:.3s;}
+.status-dot.online{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.status-dot.starting{background:var(--warn);animation:pulse .8s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.btn-sm{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-family:'Tajawal',sans-serif;transition:.15s;}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Nav tabs ── */
+.nav-tabs{background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:0;padding:0 12px;overflow-x:auto;position:sticky;top:56px;z-index:150;scrollbar-width:none;}
+.nav-tabs::-webkit-scrollbar{display:none;}
+.nav-tab{display:flex;align-items:center;gap:7px;padding:13px 16px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s;user-select:none;}
+.nav-tab:hover{color:var(--text);}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{background:var(--accent);color:#000;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;padding:1px 6px;border-radius:10px;line-height:16px;display:none;}
+.tab-badge.show{display:inline-block;}
+.ws-warn{background:#f59e0b18;border-bottom:1px solid var(--warn);color:var(--warn);padding:8px 20px;font-size:12px;display:none;font-weight:700;}
+.ws-warn.show{display:flex;align-items:center;gap:8px;}
+.pages{flex:1;}
+.page{display:none;padding:20px;max-width:1440px;margin:0 auto;}
+.page.active{display:block;}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px;flex-wrap:wrap;}
+.card-title{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:640px){.grid3{grid-template-columns:1fr 1fr;}.grid2{grid-template-columns:1fr;}}
+@media(max-width:420px){.grid3{grid-template-columns:1fr;}}
+
+/* ── Stat cards ── */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;}
+.stat-card::after{content:'';position:absolute;top:0;right:0;width:3px;height:100%;border-radius:0 var(--radius) var(--radius) 0;}
+.stat-card.green::after{background:var(--accent);}
+.stat-card.blue::after{background:var(--accent2);}
+.stat-card.red::after{background:var(--danger);}
+.stat-card.yellow::after{background:var(--warn);}
+.stat-card.purple::after{background:var(--accent3);}
+.stat-label{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;}
+.stat-val{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:var(--num-color);line-height:1;}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+.stat-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:28px;opacity:.1;}
+.progress-wrap{background:var(--muted2);border-radius:4px;height:5px;overflow:hidden;margin-top:10px;}
+.progress-bar{height:100%;border-radius:4px;background:var(--accent);transition:width .5s;}
+.progress-bar.warn{background:var(--warn);}
+.progress-bar.danger{background:var(--danger);}
+.chart-wrap{height:48px;display:flex;align-items:flex-end;gap:2px;margin-top:8px;}
+.chart-bar{flex:1;background:var(--accent);border-radius:2px 2px 0 0;opacity:.5;transition:.4s;min-height:2px;}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius);border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:'Tajawal',sans-serif;transition:.15s;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);}
+.btn-danger:hover{background:var(--danger);color:#000;}
+.btn-warn{background:transparent;border:1px solid var(--warn);color:var(--warn);}
+.btn-warn:hover{background:var(--warn);color:#000;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2);}
+.btn-info{background:transparent;border:1px solid var(--info);color:var(--info);}
+.btn-info:hover{background:var(--info);color:#000;}
+.btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
+.btn-full{width:100%;justify-content:center;}
+.btn-icon{padding:7px 10px;}
+
+/* ── Inputs ── */
+.inp{background:#060810;border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:var(--radius);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;transition:.2s;width:100%;}
+.inp:focus{border-color:var(--accent2);box-shadow:0 0 0 3px #38bdf812;}
+.inp.invalid{border-color:var(--danger);}
+.inp-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.inp-row .inp{flex:1;min-width:100px;}
+label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:700;letter-spacing:.5px;}
+.field{margin-bottom:14px;}
+
+/* ══════════════════════════════════════
+   FIX 1: Console log – LTR direction
+   ══════════════════════════════════════ */
+.console-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.console-toolbar-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.console-search{position:relative;flex:1;min-width:160px;}
+.console-search input{
+  background:#060810;border:1px solid var(--border);color:var(--text);
+  padding:7px 32px 7px 12px;border-radius:var(--radius);font-size:12px;
+  font-family:'IBM Plex Mono',monospace;outline:none;width:100%;transition:.2s;
+  direction:ltr; /* FIX: search box LTR */
+}
+.console-search input:focus{border-color:var(--accent2);}
+.search-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;}
+.search-clear:hover{color:var(--text);}
+
+/* Log counter badges */
+.log-counters{display:flex;align-items:center;gap:5px;}
+.log-count{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:.15s;}
+.log-count.err{background:#f43f5e18;border:1px solid #f43f5e40;color:var(--danger);}
+.log-count.warn{background:#f59e0b18;border:1px solid #f59e0b40;color:var(--warn);}
+.log-count:hover{filter:brightness(1.2);}
+
+/* ══════════════════════════════════════
+   FIX 1 (continued): LTR log area
+   ══════════════════════════════════════ */
+.log-area{
+  background:#04060a;border:1px solid var(--border);border-radius:var(--radius);
+  height:440px;overflow-y:auto;padding:14px;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.75;color:#6e90aa;
+  /* FIX: Force LTR for log content */
+  direction:ltr;
+  text-align:left;
+  unicode-bidi:embed;
+}
+.log-area::-webkit-scrollbar{width:4px;}
+.log-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.log-line{display:flex;align-items:baseline;gap:8px;transition:none;}
+.log-line.hl{background:#f59e0b22;}
+.log-line.hl .log-text{color:#fde68a;}
+.log-linenum{flex-shrink:0;color:var(--muted);font-size:10px;user-select:none;min-width:32px;text-align:right;}
+.log-text{flex:1;word-break:break-all;}
+
+/* Scroll-to-bottom button */
+.scroll-to-bottom{
+  position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+  background:var(--surface2);border:1px solid var(--border2);color:var(--text2);
+  padding:5px 14px;border-radius:20px;font-size:11px;cursor:pointer;
+  display:none;transition:.2s;z-index:10;font-family:'IBM Plex Mono',monospace;
+}
+.scroll-to-bottom:hover{border-color:var(--accent);color:var(--accent);}
+.scroll-to-bottom.show{display:block;}
+.console-wrap{position:relative;}
+
+/* FIX 1: Console input LTR */
+.cmd-row{display:flex;gap:8px;margin-top:10px;}
+.cmd-row input{
+  flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:10px 14px;border-radius:var(--radius);font-size:13px;
+  font-family:'IBM Plex Mono',monospace;outline:none;transition:.2s;
+  direction:ltr; /* FIX: command input LTR */
+  text-align:left;
+}
+.cmd-row input:focus{border-color:var(--accent);}
+.cmd-row button{
+  background:var(--accent);color:#000;border:none;padding:10px 20px;
+  border-radius:var(--radius);cursor:pointer;font-weight:700;
+  font-family:'Tajawal',sans-serif;transition:.15s;white-space:nowrap;
+}
+.cmd-row button:hover{filter:brightness(1.08);}
+.cmd-row button:disabled{opacity:.35;cursor:not-allowed;}
+.cmd-hints{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.cmd-hint{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;font-family:'IBM Plex Mono',monospace;transition:.15s;}
+.cmd-hint:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* ── Tables ── */
+.mc-table{width:100%;border-collapse:collapse;}
+.mc-table th{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;}
+.mc-table td{padding:10px 12px;border-bottom:1px solid var(--muted2);font-size:13px;vertical-align:middle;}
+.mc-table tr:last-child td{border-bottom:none;}
+.mc-table tbody tr:hover td{background:#ffffff03;}
+.mc-table .empty td{text-align:center;color:var(--muted);padding:32px;font-size:13px;}
+.pname{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:13px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;}
+.badge-on{background:#00e87a18;color:var(--accent);border:1px solid #00e87a30;}
+.badge-op{background:#f59e0b18;color:var(--warn);border:1px solid #f59e0b30;}
+.badge-ban{background:#f43f5e18;color:var(--danger);border:1px solid #f43f5e30;}
+.act-btns{display:flex;gap:4px;flex-wrap:wrap;}
+.act-btn{padding:4px 9px;border-radius:3px;border:none;cursor:pointer;font-size:11px;font-weight:700;font-family:'Tajawal',sans-serif;transition:.15s;}
+.act-ok{background:transparent;border:1px solid var(--accent);color:var(--accent);}
+.act-ok:hover{background:var(--accent);color:#000;}
+.act-warn{background:transparent;border:1px solid var(--warn);color:var(--warn);}
+.act-warn:hover{background:var(--warn);color:#000;}
+.act-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);}
+.act-info{background:transparent;border:1px solid var(--info);color:var(--info);}
+.act-info:hover{background:var(--info);color:#000;}
+.act-danger:hover{background:var(--danger);color:#000;}
+
+/* ── Player cards (Falix-style) ── */
+.player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:4px;}
+.player-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:12px;transition:.15s;cursor:default;}
+.player-card:hover{border-color:var(--border2);}
+.player-avatar{width:36px;height:36px;border-radius:4px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.player-info{flex:1;min-width:0;}
+.player-name{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.player-status{font-size:10px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px;}
+.player-online-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.player-btns{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;}
+
+/* ── Sub-tabs ── */
+.sub-tabs{display:flex;gap:3px;margin-bottom:14px;background:var(--surface2);padding:4px;border-radius:6px;width:fit-content;flex-wrap:wrap;}
+.sub-tab{padding:6px 14px;border-radius:4px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px;}
+.sub-tab.active{background:var(--surface);color:var(--text);}
+.sub-tab:hover:not(.active){color:var(--text);}
+.sub-page{display:none;}
+.sub-page.active{display:block;}
+
+/* ══════════════════════════════════════
+   FIX 3: File manager
+   ══════════════════════════════════════ */
+.breadcrumb{
+  display:flex;align-items:center;gap:4px;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);
+  margin-bottom:12px;flex-wrap:wrap;
+  /* FIX: breadcrumb paths are LTR */
+  direction:ltr;text-align:left;
+}
+.breadcrumb .bc-part{cursor:pointer;color:var(--accent2);}
+.breadcrumb .bc-part:hover{text-decoration:underline;}
+.breadcrumb .bc-sep{color:var(--muted);}
+.file-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.file-toolbar .inp{max-width:200px;direction:ltr;}
+.file-icon{margin-left:6px;font-size:14px;}
+.fname{font-family:'IBM Plex Mono',monospace;font-size:12px;direction:ltr;}
+.fsize{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;}
+#file-editor-wrap{display:none;margin-top:12px;}
+.editor-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.editor-filename{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2);direction:ltr;}
+textarea.editor{
+  width:100%;height:420px;background:#04060a;border:1px solid var(--border);
+  color:#93c5fd;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;
+  padding:14px;border-radius:var(--radius);outline:none;resize:vertical;
+  /* FIX: editor always LTR */
+  direction:ltr;text-align:left;
+}
+textarea.editor:focus{border-color:var(--accent);}
+
+/* ── Backups ── */
+.backup-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;flex-wrap:wrap;gap:8px;transition:.15s;}
+.backup-row:hover{border-color:var(--border2);}
+.backup-name{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text);direction:ltr;}
+.backup-meta{font-size:11px;color:var(--muted);margin-top:3px;}
+.backup-actions{display:flex;gap:6px;}
+
+/* ── Settings ── */
+.settings-group{margin-bottom:24px;}
+.settings-group-title{font-size:10px;font-weight:700;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--muted2);flex-wrap:wrap;gap:8px;}
+.setting-row:last-child{border-bottom:none;}
+.setting-info{flex:1;min-width:200px;}
+.setting-name{font-size:14px;font-weight:700;}
+.setting-desc{font-size:11px;color:var(--muted);margin-top:2px;}
+.setting-control{margin-right:20px;}
+.toggle{position:relative;width:42px;height:22px;display:inline-block;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--muted2);border-radius:22px;cursor:pointer;transition:.2s;}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;right:3px;transition:.2s;}
+.toggle input:checked+.toggle-slider{background:var(--accent);}
+.toggle input:checked+.toggle-slider::before{right:auto;left:3px;}
+select.sel{background:#060810;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--radius);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;cursor:pointer;transition:.2s;}
+select.sel:focus{border-color:var(--accent2);}
+.quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px;}
+.quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:'Tajawal',sans-serif;transition:.15s;text-align:center;}
+.quick-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.filter-bar .inp{max-width:220px;}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--accent);color:var(--accent);padding:10px 24px;border-radius:var(--radius);font-size:13px;font-weight:700;transition:.25s;z-index:9999;opacity:0;pointer-events:none;max-width:90vw;text-align:center;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.toast.err{border-color:var(--danger);color:var(--danger);}
+.toast.warn{border-color:var(--warn);color:var(--warn);}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:#00000099;z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.modal-overlay.show{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:28px;width:460px;max-width:95vw;box-shadow:0 24px 60px #00000066;}
+.modal h3{font-size:17px;font-weight:900;margin-bottom:8px;}
+.modal p{color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.6;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+
+/* ── Disk bar ── */
+.disk-labels{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:6px;}
+
+/* ── Info card ── */
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--muted2);font-size:12px;}
+.info-row:last-child{border-bottom:none;}
+.info-key{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px;}
+.info-val{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);direction:ltr;}
+
+/* ── Total players stats card ── */
+.players-summary{display:flex;gap:10px;margin-bottom:14px;}
+.players-summary-card{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;}
+.players-summary-num{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:var(--num-color);}
+.players-summary-label{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
+
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  header{padding:0 12px;}
+  .hdr-stats{display:none;}
+  .logo{font-size:13px;}
+  .page{padding:12px;}
+  .card{padding:14px;}
+  .log-area{height:320px;}
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">MC // PANEL</div>
+    <h1>تسجيل الدخول</h1>
+    <p>لوحة تحكم سيرفر ماينكرافت</p>
+    <input type="text" id="un" placeholder="Username" autocomplete="username">
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')login()">
+    <button class="btn-login" id="loginBtn" onclick="login()">دخول</button>
+    <div class="login-err" id="lerr"></div>
+  </div>
+</div>
+
+<div id="panel">
+  <header>
+    <div class="logo">MC<span>//</span>PANEL</div>
+    <div class="hdr-center">
+      <div class="hdr-version" id="hdr-version">—</div>
+      <div class="hdr-stats" id="hdr-stats" style="display:none;">
+        <div class="hdr-stat"><div class="hdr-stat-dot green"></div><span id="hdr-uptime">0م</span></div>
+        <div class="hdr-stat">👥 <span id="hdr-players">0</span>/—</div>
+        <div class="hdr-stat">TPS <span id="hdr-tps" style="color:var(--accent);">—</span></div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <div class="status-pill">
+        <div class="status-dot" id="sdot"></div>
+        <span id="stxt" style="font-family:'IBM Plex Mono',monospace;font-size:11px;">متوقف</span>
+      </div>
+      <button class="btn-sm" id="theme-btn" onclick="toggleTheme()" title="تبديل الوضع">🌙</button>
+      <button class="btn-sm" onclick="logout()">خروج</button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('overview')">📊 نظرة عامة</div>
+    <div class="nav-tab" onclick="showPage('console')">⌨️ الكونسول</div>
+    <div class="nav-tab" onclick="showPage('players')">
+      👥 اللاعبون
+      <span class="tab-badge" id="players-badge">0</span>
+    </div>
+    <div class="nav-tab" onclick="showPage('files')">📁 الملفات</div>
+    <div class="nav-tab" onclick="showPage('backups')">💾 النسخ الاحتياطية</div>
+    <div class="nav-tab" onclick="showPage('settings')">⚙️ الإعدادات</div>
+  </nav>
+
+  <div class="ws-warn" id="wsWarn">⚠ انقطع الاتصال بالسيرفر — يعيد المحاولة...</div>
+
+  <div class="pages">
+
+    <div class="page active" id="page-overview">
+      <div class="grid3">
+        <div class="stat-card green">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-label">الحالة</div>
+          <div class="stat-val" id="ov-status">متوقف</div>
+          <div class="stat-sub" id="ov-uptime">—</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">👤</div>
+          <div class="stat-label">اللاعبون</div>
+          <div class="stat-val" id="ov-players">0</div>
+          <div class="stat-sub">متصل الآن</div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-icon">📡</div>
+          <div class="stat-label">TPS</div>
+          <div class="stat-val" id="ov-tps">—</div>
+          <div class="stat-sub">الهدف: 20.0</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">الذاكرة RAM</div>
+            <span id="ram-pct" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);">0%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span id="ram-used" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--num-color);">— MB</span>
+            <span id="ram-max" style="font-size:11px;color:var(--muted);">/ — MB</span>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="ram-bar" style="width:0%"></div></div>
+          <div class="chart-wrap" id="ram-chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">مساحة القرص</div>
+            <span id="disk-pct" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);">—%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span id="disk-used" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--num-color);">—</span>
+            <span id="disk-total" style="font-size:11px;color:var(--muted);">/ —</span>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="disk-bar" style="width:0%;background:var(--accent2)"></div></div>
+          <div class="disk-labels">
+            <span>مستخدم</span>
+            <span id="disk-free-label">متاح: —</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:14px;">تحكم بالسيرفر</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-primary btn-full" id="bstart" onclick="startServer()">▶ تشغيل</button>
+            <button class="btn btn-danger btn-full" id="bstop" onclick="stopServer()">■ إيقاف</button>
+            <button class="btn btn-warn btn-full" id="brestart" onclick="restartServer()">↺ إعادة التشغيل</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="margin-bottom:14px;">معلومات السيرفر</div>
+          <div class="info-row"><span class="info-key">الإصدار</span><span class="info-val" id="info-ver">—</span></div>
+          <div class="info-row"><span class="info-key">الملف</span><span class="info-val" id="info-jar" style="font-size:10px;">—</span></div>
+          <div class="info-row"><span class="info-key">PID</span><span class="info-val" id="info-pid">—</span></div>
+          <div class="info-row"><span class="info-key">TPS</span><span class="info-val" id="info-tps">—</span></div>
+          <div class="info-row"><span class="info-key">Directory</span><span class="info-val" id="info-dir" style="font-size:10px;">—</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;">أوامر سريعة</div>
+        <div class="quick-grid">
+          <button class="quick-btn" onclick="cmd('save-all')">💾 حفظ العالم</button>
+          <button class="quick-btn" onclick="cmd('time set day')">☀️ نهار</button>
+          <button class="quick-btn" onclick="cmd('time set night')">🌙 ليل</button>
+          <button class="quick-btn" onclick="cmd('weather clear')">🌤️ طقس صافٍ</button>
+          <button class="quick-btn" onclick="cmd('weather rain')">🌧️ مطر</button>
+          <button class="quick-btn" onclick="cmd('gamerule doDaylightCycle false')">⏸️ إيقاف الوقت</button>
+          <button class="quick-btn" onclick="cmd('gamerule doDaylightCycle true')">▶️ تشغيل الوقت</button>
+          <button class="quick-btn" onclick="cmd('gamerule keepInventory true')">🎒 حفظ المخزون</button>
+          <button class="quick-btn" onclick="cmd('gamerule keepInventory false')">❌ إلغاء حفظ المخزون</button>
+          <button class="quick-btn" onclick="cmd('gamerule doMobSpawning false')">🚫 إيقاف المخلوقات</button>
+          <button class="quick-btn" onclick="cmd('gamerule doMobSpawning true')">✅ تشغيل المخلوقات</button>
+          <button class="quick-btn" onclick="cmd('list')">👥 قائمة اللاعبين</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">سجل حديث</div></div>
+        <div class="log-area" id="mini-log" style="height:180px;"></div>
+      </div>
+    </div>
+
+    <div class="page" id="page-console">
+      <div class="card">
+        <div class="console-toolbar">
+          <div class="console-search">
+            <input type="text" id="log-search" placeholder="Search logs..." oninput="filterLog()">
+            <button class="search-clear" onclick="clearSearch()" title="مسح">✕</button>
+          </div>
+          <div class="log-counters">
+            <div class="log-count err" id="err-count" onclick="filterByType('ERROR')" title="تصفية بالأخطاء">
+              ✕ <span id="err-num">0</span>
+            </div>
+            <div class="log-count warn" id="warn-count" onclick="filterByType('WARN')" title="تصفية بالتحذيرات">
+              ⚠ <span id="warn-num">0</span>
+            </div>
+          </div>
+          <div class="console-toolbar-right">
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="toggleLineNumbers()" id="linenum-btn">## أرقام</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="toggleAutoScroll()" id="autoscroll-btn">↓ تلقائي</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="clearLog()">مسح</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="downloadLog()">⬇ تنزيل</button>
+          </div>
+        </div>
+        <div class="console-wrap">
+          <div class="log-area" id="log"></div>
+          <button class="scroll-to-bottom" id="scroll-btn" onclick="scrollToBottom()">↓ اذهب للأسفل</button>
+        </div>
+        <div class="cmd-row">
+          <input type="text" id="cmdinput" placeholder="Server command... (↑↓ history)" maxlength="256" onkeydown="handleCmdKey(event)">
+          <button id="cmdBtn" onclick="sendCmd()">إرسال ↵</button>
+        </div>
+        <div class="cmd-hints">
+          <span class="cmd-hint" onclick="fillCmd('say ')">say</span>
+          <span class="cmd-hint" onclick="fillCmd('give ')">give</span>
+          <span class="cmd-hint" onclick="fillCmd('tp ')">tp</span>
+          <span class="cmd-hint" onclick="fillCmd('gamemode creative ')">creative</span>
+          <span class="cmd-hint" onclick="fillCmd('gamemode survival ')">survival</span>
+          <span class="cmd-hint" onclick="fillCmd('effect give ')">effect</span>
+          <span class="cmd-hint" onclick="fillCmd('enchant ')">enchant</span>
+          <span class="cmd-hint" onclick="fillCmd('op ')">op</span>
+          <span class="cmd-hint" onclick="fillCmd('deop ')">deop</span>
+          <span class="cmd-hint" onclick="fillCmd('kick ')">kick</span>
+          <span class="cmd-hint" onclick="fillCmd('ban ')">ban</span>
+          <span class="cmd-hint" onclick="fillCmd('pardon ')">pardon</span>
+          <span class="cmd-hint" onclick="fillCmd('whitelist add ')">whitelist add</span>
+          <span class="cmd-hint" onclick="fillCmd('tps')">tps</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-players">
+      <div class="players-summary">
+        <div class="players-summary-card">
+          <div class="players-summary-num" id="total-online">0</div>
+          <div class="players-summary-label">متصلون الآن</div>
+        </div>
+        <div class="players-summary-card">
+          <div class="players-summary-num" id="total-players" style="color:var(--accent2);">—</div>
+          <div class="players-summary-label">إجمالي اللاعبين</div>
+        </div>
+        <div class="players-summary-card">
+          <div class="players-summary-num" id="total-ops" style="color:var(--warn);">—</div>
+          <div class="players-summary-label">مشرفون</div>
+        </div>
+        <div class="players-summary-card">
+          <div class="players-summary-num" id="total-banned" style="color:var(--danger);">—</div>
+          <div class="players-summary-label">محظورون</div>
+        </div>
+      </div>
+
+      <div class="sub-tabs">
+        <div class="sub-tab active" data-sub="online" onclick="showSubTab('players','online')">🟢 متصلون <span id="online-count-badge" style="font-size:10px;color:var(--muted);">(0)</span></div>
+        <div class="sub-tab" data-sub="whitelist" onclick="showSubTab('players','whitelist');loadWhitelist()">📋 Whitelist</div>
+        <div class="sub-tab" data-sub="ops" onclick="showSubTab('players','ops');loadOps()">⭐ المشرفون</div>
+        <div class="sub-tab" data-sub="banned" onclick="showSubTab('players','banned');loadBans()">🚫 المحظورون</div>
+      </div>
+
+      <div class="sub-page active" id="players-online">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">اللاعبون المتصلون</div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="cmd('list')">↻ تحديث</button>
+            </div>
+          </div>
+          <div class="filter-bar">
+            <input class="inp" id="player-filter" placeholder="تصفية..." style="max-width:180px;" oninput="renderPlayers()">
+            <input class="inp" id="pname" placeholder="اسم اللاعب" maxlength="16" style="max-width:150px;direction:ltr;">
+            <button class="btn btn-ghost" onclick="pa('op')">OP ✓</button>
+            <button class="btn btn-warn" onclick="pa('deop')">OP ✗</button>
+            <button class="btn btn-warn" onclick="pa('kick')">طرد</button>
+            <button class="btn btn-danger" onclick="pa('ban')">حظر</button>
+          </div>
+          <div class="player-grid" id="plist-grid">
+            <div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">لا يوجد لاعبون متصلون</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="players-whitelist">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">القائمة البيضاء</div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-icon" onclick="cmd('whitelist on');toast('تفعيل Whitelist')">✅ تفعيل</button>
+              <button class="btn btn-ghost btn-icon" onclick="cmd('whitelist off');toast('تعطيل Whitelist','warn')">❌ تعطيل</button>
+              <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="loadWhitelist()">↻</button>
+            </div>
+          </div>
+          <div class="inp-row">
+            <input class="inp" id="wl-name" placeholder="اسم اللاعب" maxlength="16" style="direction:ltr;">
+            <button class="btn btn-primary" onclick="wlAction('add')">إضافة</button>
+            <button class="btn btn-danger" onclick="wlAction('remove')">إزالة</button>
+          </div>
+          <div id="drop-zone" style="border: 2px dashed transparent; border-radius: 8px; transition: .2s; padding: 4px;">
+        <table class="mc-table">
+            <thead><tr><th>اللاعب</th><th>UUID</th><th></th></tr></thead>
+            <tbody id="wl-body"><tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="players-ops">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">المشرفون (OP)</div>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="loadOps()">↻</button>
+          </div>
+          <div class="inp-row">
+            <input class="inp" id="op-name" placeholder="اسم اللاعب" maxlength="16" style="direction:ltr;">
+            <button class="btn btn-primary" onclick="opAction('op')">منح OP</button>
+            <button class="btn btn-danger" onclick="opAction('deop')">سحب OP</button>
+          </div>
+          <table class="mc-table">
+            <thead><tr><th>اللاعب</th><th>المستوى</th><th>UUID</th></tr></thead>
+            <tbody id="ops-body"><tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="sub-page" id="players-banned">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">اللاعبون المحظورون</div>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="loadBans()">↻</button>
+          </div>
+          <div class="inp-row">
+            <input class="inp" id="ban-name" placeholder="اسم اللاعب" maxlength="16" style="direction:ltr;">
+            <input class="inp" id="ban-reason" placeholder="السبب (اختياري)">
+            <button class="btn btn-danger" onclick="banAction()">حظر</button>
+            <button class="btn btn-ghost" onclick="unbanAction()">فك الحظر</button>
+          </div>
+          <table class="mc-table">
+            <thead><tr><th>اللاعب</th><th>السبب</th><th>التاريخ</th><th></th></tr></thead>
+            <tbody id="bans-body"><tr class="empty"><td colspan="4">جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-files">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">مدير الملفات</div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="fileGoUp()">↑ للأعلى</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="fileRefresh()">↻ تحديث</button>
+          </div>
+        </div>
+        <div class="breadcrumb" id="file-breadcrumb"></div>
+        <div class="file-toolbar">
+          <input class="inp" id="file-search" placeholder="Search files..." oninput="filterFiles()" style="max-width:220px;">
+          <button class="btn btn-primary" onclick="document.getElementById('file-upload-input').click()">⬆ رفع ملف</button>
+          <input type="file" id="file-upload-input" style="display:none" multiple onchange="handleFileUpload(event)">
+        </div>
+        <table class="mc-table">
+          <thead><tr><th>الاسم</th><th>الحجم</th><th>النوع</th><th>الإجراءات</th></tr></thead>
+          <tbody id="file-tbody"></tbody>
+        </table>
+      </div>
+      <div id="file-editor-wrap">
+        <div class="card">
+          <div class="editor-header">
+            <span class="editor-filename" id="editor-filename"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" onclick="saveFile()">💾 حفظ</button>
+              <button class="btn btn-ghost" onclick="closeEditor()">✕ إغلاق</button>
+            </div>
+          </div>
+          <textarea class="editor" id="file-editor" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-backups">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">النسخ الاحتياطية</div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="loadBackups()">↻ تحديث</button>
+            <button class="btn btn-primary" onclick="createBackup()">+ إنشاء نسخة</button>
+          </div>
+        </div>
+        <div id="backup-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;">نسخ تلقائي</div>
+        <div class="inp-row" style="align-items:center;">
+          <input class="inp" id="auto-backup-interval" type="number" value="60" min="5" max="1440" style="max-width:100px;">
+          <span style="font-size:13px;color:var(--muted);">دقيقة</span>
+          <button class="btn btn-primary" onclick="setAutoBackup()">تفعيل</button>
+          <button class="btn btn-ghost" onclick="clearAutoBackup()">إيقاف</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="auto-backup-status">غير مفعّل</div>
+      </div>
+    </div>
+
+    <div class="page" id="page-settings">
+      <div class="sub-tabs">
+        <div class="sub-tab active" data-sub="properties" onclick="showSubTab('settings','properties');loadProps()">⚙️ server.properties</div>
+        <div class="sub-tab" data-sub="startup" onclick="showSubTab('settings','startup');loadStartupSettings()">🚀 JVM</div>
+        <div class="sub-tab" data-sub="panel" onclick="showSubTab('settings','panel')">🎛️ اللوحة</div>
+      </div>
+
+      <div class="sub-page active" id="settings-properties">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">server.properties</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-ghost" onclick="loadProps()">↻ تحميل</button>
+              <button class="btn btn-primary" onclick="applyProps()">💾 حفظ</button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">معلومات عامة</div>
+            <div class="field"><label class="lbl">MOTD (اسم السيرفر)</label><input class="inp" id="prop-motd" placeholder="A Minecraft Server"></div>
+            <div class="grid2">
+              <div class="field"><label class="lbl">الحد الأقصى للاعبين</label><input class="inp" id="prop-maxplayers" type="number" min="1" max="1000" value="20"></div>
+              <div class="field"><label class="lbl">منفذ السيرفر</label><input class="inp" id="prop-port" type="number" value="25565" style="direction:ltr;"></div>
+            </div>
+            <div class="grid2">
+              <div class="field"><label class="lbl">الصعوبة</label>
+                <select class="sel" id="prop-difficulty" style="width:100%">
+                  <option value="peaceful">Peaceful</option>
+                  <option value="easy">Easy</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+              <div class="field"><label class="lbl">نمط اللعبة الافتراضي</label>
+                <select class="sel" id="prop-gamemode" style="width:100%">
+                  <option value="survival" selected>Survival</option>
+                  <option value="creative">Creative</option>
+                  <option value="adventure">Adventure</option>
+                  <option value="spectator">Spectator</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">خيارات اللعب</div>
+            <div class="setting-row"><div class="setting-info"><div class="setting-name">PvP</div><div class="setting-desc">السماح بالقتال بين اللاعبين</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-pvp" checked><span class="toggle-slider"></span></label></div></div>
+            <div class="setting-row"><div class="setting-info"><div class="setting-name">Whitelist</div><div class="setting-desc">تقييد الدخول بقائمة محددة</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-whitelist"><span class="toggle-slider"></span></label></div></div>
+            <div class="setting-row"><div class="setting-info"><div class="setting-name">Command Blocks</div><div class="setting-desc">تفعيل بلوكات الأوامر</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-cmdblocks"><span class="toggle-slider"></span></label></div></div>
+            <div class="setting-row"><div class="setting-info"><div class="setting-name">Online Mode</div><div class="setting-desc">التحقق من حسابات Mojang</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-online" checked><span class="toggle-slider"></span></label></div></div>
+            <div class="setting-row"><div class="setting-info"><div class="setting-name">Nether</div><div class="setting-desc">تفعيل عالم الـ Nether</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-nether" checked><span class="toggle-slider"></span></label></div></div>
+            <div class="setting-row"><div class="setting-info"><div class="setting-name">Hardcore Mode</div><div class="setting-desc">الموت النهائي</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-hardcore"><span class="toggle-slider"></span></label></div></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">الأداء</div>
+            <div class="grid2">
+              <div class="field"><label class="lbl">View Distance (chunks)</label><input class="inp" id="prop-viewdist" type="number" min="2" max="32" value="10"></div>
+              <div class="field"><label class="lbl">Simulation Distance (chunks)</label><input class="inp" id="prop-simdist" type="number" min="2" max="16" value="10"></div>
+            </div>
+            <div class="field"><label class="lbl">وقت الخمول قبل الطرد (دقائق، 0=معطّل)</label><input class="inp" id="prop-idletimeout" type="number" min="0" value="0"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-startup">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px;">إعدادات JVM</div>
+          <div class="grid2">
+            <div class="field"><label class="lbl">الحد الأدنى (Xms)</label>
+              <select class="sel" id="jvm-xms" style="width:100%">
+                <option value="512M">512 MB</option>
+                <option value="1G" selected>1 GB</option>
+                <option value="2G">2 GB</option>
+                <option value="4G">4 GB</option>
+              </select>
+            </div>
+            <div class="field"><label class="lbl">الحد الأقصى (Xmx)</label>
+              <select class="sel" id="jvm-xmx" style="width:100%">
+                <option value="2G" selected>2 GB</option>
+                <option value="4G">4 GB</option>
+                <option value="6G">6 GB</option>
+                <option value="8G">8 GB</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">G1GC (موصى به)</div><div class="setting-desc">-XX:+UseG1GC وعلامات تحسين GC المتقدمة</div></div>
+            <div class="setting-control"><label class="toggle"><input type="checkbox" id="jvm-g1gc" checked><span class="toggle-slider"></span></label></div>
+          </div>
+          <div class="field" style="margin-top:14px;"><label class="lbl">علامات JVM إضافية</label><input class="inp" id="jvm-extra" placeholder="-Dfoo=bar ..." style="direction:ltr;"></div>
+          <div style="margin-top:14px;display:flex;align-items:center;gap:12px;">
+            <button class="btn btn-primary" onclick="applyStartup()">💾 حفظ</button>
+            <span style="font-size:11px;color:var(--muted);">تُطبَّق عند الإقلاع القادم.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-panel">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px;">إعدادات اللوحة</div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">تحديث قائمة اللاعبين تلقائياً</div><div class="setting-desc">كل 30 ثانية عبر أمر list</div></div>
+            <div class="setting-control"><label class="toggle"><input type="checkbox" id="pref-autolist" checked onchange="toggleAutoList()"><span class="toggle-slider"></span></label></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">التمرير التلقائي للكونسول</div><div class="setting-desc">يبقى في الأسفل دائماً</div></div>
+            <div class="setting-control"><label class="toggle"><input type="checkbox" id="pref-autoscroll" checked><span class="toggle-slider"></span></label></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">أرقام الأسطر في الكونسول</div><div class="setting-desc">عرض رقم كل سطر</div></div>
+            <div class="setting-control"><label class="toggle"><input type="checkbox" id="pref-linenum"><span class="toggle-slider"></span></label></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">حد عقد الكونسول</div><div class="setting-desc">الأسطر المعروضة في DOM</div></div>
+            <div class="setting-control" style="display:flex;align-items:center;gap:8px;">
+              <input class="inp" id="pref-maxlog" type="number" value="800" min="100" max="5000" style="width:80px;">
+              <button class="btn btn-ghost" style="padding:6px 12px;" onclick="applyPanelSettings()">حفظ</button>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">اختصارات لوحة المفاتيح</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--text2);">Ctrl+L</span><span style="color:var(--muted);">مسح الكونسول</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--text2);">Ctrl+/</span><span style="color:var(--muted);">التركيز على الكونسول</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--text2);">↑ / ↓</span><span style="color:var(--muted);">تاريخ الأوامر</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--text2);">Escape</span><span style="color:var(--muted);">إغلاق النافذة</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div></div><div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="modal-title">تأكيد</h3>
+    <p id="modal-body">هل أنت متأكد؟</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
+      <button class="btn btn-danger" id="modal-confirm">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+'use strict';
+var PLAYER_RE = /^[a-zA-Z0-9_]{1,16}$/;
+var ws=null, wsConnected=false, running=false;
+var players=new Set(), cmdHistory=[], cmdHistIdx=-1;
+var currentFilePath='', currentEditFile='';
+var backups=[], startTime=null, uptimeTimer=null, listInterval=null, autoBackupInterval=null;
+var ramHistory=new Array(20).fill(0);
+var MAX_LOG_NODES=800, modalCallback=null, autoScrollEnabled=true, showLineNumbers=false;
+var searchQuery='', logLineCount=0, errCount=0, warnCount=0, filterType=null;
+var _files=[];
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function fmtBytes(b){return b==null?'—':b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':b<1073741824?(b/1048576).toFixed(1)+'MB':(b/1073741824).toFixed(2)+'GB';}
+
+async function login(){
+  var btn=document.getElementById('loginBtn'),err=document.getElementById('lerr');
+  btn.disabled=true;btn.textContent='...';err.style.display='none';
+  try{
+    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('un').value,password:document.getElementById('pw').value})});
+    if(r.ok){document.getElementById('login-screen').style.display='none';document.getElementById('panel').style.display='flex';initWS();fetchStatus();loadFiles('');loadBackups();loadProps();fetchInfo();}
+    else{var d=await r.json().catch(function(){return{};});err.textContent=r.status===429?(d.error||'محاولات كثيرة'):'بيانات خاطئة';err.style.display='block';}
+  }catch(e){err.textContent='خطأ في الاتصال';err.style.display='block';}
+  finally{btn.disabled=false;btn.textContent='دخول';}
+}
+async function logout(){await fetch('/api/logout',{method:'POST'}).catch(function(){});location.reload();}
+
+function initWS(){
+  var proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(proto+'://'+location.host);
+  ws.onopen=function(){wsConnected=true;document.getElementById('wsWarn').classList.remove('show');};
+  ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}if(m.type==='log')appendLog(m.data);if(m.type==='status'){setStatus(m.running);if(m.version)setVersion(m.version);}if(m.type==='stats')updateStats(m);if(m.type==='info')setVersion(m.version);};
+  ws.onclose=function(){wsConnected=false;document.getElementById('wsWarn').classList.add('show');setTimeout(initWS,3000);};
+  ws.onerror=function(){ws.close();};
+}
+async function fetchStatus(){
+  try{var r=await fetch('/api/status');if(!r.ok)return;var d=await r.json();setStatus(d.running);if(d.version)setVersion(d.version);if(d.uptime&&d.running)startTime=Date.now()-d.uptime;if(d.tps!=null)updateStats({tps:d.tps});document.getElementById('info-pid').textContent=d.pid||'—';document.getElementById('info-tps').textContent=d.tps!=null?parseFloat(d.tps).toFixed(1):'—';document.getElementById('hdr-tps').textContent=d.tps!=null?parseFloat(d.tps).toFixed(1):'—';}catch(e){}
+}
+async function fetchInfo(){
+  try{var r=await fetch('/api/info');if(!r.ok)return;var d=await r.json();if(d.version)setVersion(d.version);document.getElementById('info-jar').textContent=d.jar||'—';document.getElementById('info-pid').textContent=d.pid||'—';document.getElementById('info-dir').textContent=d.serverDir||'—';
+    if(d.diskTotal&&d.diskFree!=null){var used=d.diskTotal-d.diskFree,pct=Math.round(used/d.diskTotal*100);document.getElementById('disk-used').textContent=fmtBytes(used);document.getElementById('disk-total').textContent='/ '+fmtBytes(d.diskTotal);document.getElementById('disk-free-label').textContent='متاح: '+fmtBytes(d.diskFree);var bar=document.getElementById('disk-bar');bar.style.width=pct+'%';bar.style.background=pct>85?'var(--danger)':pct>65?'var(--warn)':'var(--accent2)';document.getElementById('disk-pct').textContent=pct+'%';}
+  }catch(e){}
+}
+function setStatus(r){
+  running=r;
+  document.getElementById('sdot').className='status-dot'+(r?' online':'');
+  document.getElementById('stxt').textContent=r?'يعمل':'متوقف';
+  document.getElementById('ov-status').textContent=r?'يعمل':'متوقف';
+  document.getElementById('ov-status').style.color=r?'var(--accent)':'var(--danger)';
+  var b;
+  if(b=document.getElementById('bstart'))b.disabled=r;
+  if(b=document.getElementById('bstop'))b.disabled=!r;
+  if(b=document.getElementById('brestart'))b.disabled=false;
+  if(b=document.getElementById('cmdBtn'))b.disabled=!r;
+  var hs=document.getElementById('hdr-stats');if(hs)hs.style.display=r?'flex':'none';
+  if(r){startTime=startTime||Date.now();if(!uptimeTimer)uptimeTimer=setInterval(updateUptime,1000);var pref=document.getElementById('pref-autolist');if(!listInterval&&pref&&pref.checked)listInterval=setInterval(function(){if(running&&wsConnected)cmd('list');},30000);}
+  else{startTime=null;clearInterval(uptimeTimer);uptimeTimer=null;clearInterval(listInterval);listInterval=null;document.getElementById('ov-uptime').textContent='—';document.getElementById('ov-tps').textContent='—';document.getElementById('info-tps').textContent='—';document.getElementById('info-pid').textContent='—';document.getElementById('hdr-tps').textContent='—';document.getElementById('hdr-uptime').textContent='0م';players.clear();renderPlayers();updatePlayerBadge();}
+}
+function setVersion(ver){if(!ver)return;document.getElementById('hdr-version').textContent=ver;document.getElementById('hdr-version').style.display='block';document.getElementById('info-ver').textContent=ver;}
+function updateUptime(){if(!startTime)return;var s=Math.floor((Date.now()-startTime)/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;document.getElementById('ov-uptime').textContent=h>0?h+'س '+m+'د '+sec+'ث':m>0?m+'د '+sec+'ث':sec+'ث';document.getElementById('hdr-uptime').textContent=h>0?h+'س '+m+'د':m>0?m+'د':sec+'ث';}
+function updateStats(m){
+  if(m.tps!=null){var tps=parseFloat(m.tps).toFixed(1),color=tps>=18?'var(--accent)':tps>=15?'var(--warn)':'var(--danger)';document.getElementById('ov-tps').textContent=tps;document.getElementById('ov-tps').style.color=color;document.getElementById('info-tps').textContent=tps;document.getElementById('hdr-tps').textContent=tps;document.getElementById('hdr-tps').style.color=color;}
+  if(m.ramUsed!=null&&m.ramMax!=null){var pct=Math.round(m.ramUsed/m.ramMax*100);document.getElementById('ram-used').textContent=m.ramUsed+' MB';document.getElementById('ram-max').textContent='/ '+m.ramMax+' MB';document.getElementById('ram-pct').textContent=pct+'%';var bar=document.getElementById('ram-bar');bar.style.width=pct+'%';bar.className='progress-bar'+(pct>85?' danger':pct>65?' warn':'');ramHistory.push(pct);ramHistory.shift();renderRamChart();}
+}
+function renderRamChart(){var chart=document.getElementById('ram-chart');if(!chart)return;var max=Math.max.apply(null,ramHistory.concat([1]));chart.innerHTML='';ramHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
+async function apiPost(url,body){body=body||{};var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.error||r.statusText);}return r.json();}
+async function startServer(){try{await apiPost('/api/start');toast('جارٍ التشغيل...');}catch(e){toast(e.message,'err');}}
+async function stopServer(){confirm2('إيقاف السيرفر','سيتوقف السيرفر ويُطرد جميع اللاعبين.',async function(){try{await apiPost('/api/stop');toast('جارٍ الإيقاف...','warn');}catch(e){toast(e.message,'err');}});}
+async function restartServer(){confirm2('إعادة التشغيل','سيتوقف ثم يعود تلقائياً.',async function(){try{await apiPost('/api/restart');toast('جارٍ إعادة التشغيل...','warn');startTime=null;}catch(e){toast(e.message,'err');}});}
+async function cmd(c){try{await apiPost('/api/command',{command:c});}catch(e){toast(e.message,'err');}}
+function handleCmdKey(e){if(e.key==='Enter'){sendCmd();return;}var input=document.getElementById('cmdinput');if(e.key==='ArrowUp'){e.preventDefault();if(cmdHistIdx<cmdHistory.length-1){cmdHistIdx++;input.value=cmdHistory[cmdHistory.length-1-cmdHistIdx]||'';}}if(e.key==='ArrowDown'){e.preventDefault();if(cmdHistIdx>0){cmdHistIdx--;input.value=cmdHistory[cmdHistory.length-1-cmdHistIdx]||'';}else{cmdHistIdx=-1;input.value='';}}}
+async function sendCmd(){var input=document.getElementById('cmdinput'),val=input.value.trim();if(!val)return;cmdHistory.push(val);if(cmdHistory.length>100)cmdHistory.shift();cmdHistIdx=-1;input.value='';await cmd(val);}
+function fillCmd(prefix){var input=document.getElementById('cmdinput');input.value=prefix;input.focus();showPage('console');}
+function clearLog(){['log','mini-log'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML='';});logLineCount=0;errCount=0;warnCount=0;updateLogCounters();}
+function downloadLog(){var lines=Array.prototype.slice.call(document.getElementById('log').querySelectorAll('.log-text')).map(function(d){return d.textContent;}).join('\n');var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines],{type:'text/plain'}));a.download='mc-log-'+new Date().toISOString().slice(0,10)+'.txt';a.click();}
+function toggleAutoScroll(){autoScrollEnabled=!autoScrollEnabled;var btn=document.getElementById('autoscroll-btn');btn.style.color=autoScrollEnabled?'var(--accent)':'';btn.style.borderColor=autoScrollEnabled?'var(--accent)':'';var pref=document.getElementById('pref-autoscroll');if(pref)pref.checked=autoScrollEnabled;if(autoScrollEnabled)scrollToBottom();toast(autoScrollEnabled?'تمرير تلقائي مفعّل':'تمرير تلقائي معطّل');}
+function toggleLineNumbers(){showLineNumbers=!showLineNumbers;var btn=document.getElementById('linenum-btn');if(btn){btn.style.color=showLineNumbers?'var(--accent)':'';btn.style.borderColor=showLineNumbers?'var(--accent)':'';}var pref=document.getElementById('pref-linenum');if(pref)pref.checked=showLineNumbers;document.getElementById('log').querySelectorAll('.log-linenum').forEach(function(el){el.style.display=showLineNumbers?'':'none';});}
+function scrollToBottom(){var area=document.getElementById('log');if(area)area.scrollTop=area.scrollHeight;}
+function filterLog(){searchQuery=document.getElementById('log-search').value.toLowerCase().trim();filterType=null;applyLogFilter();}
+function filterByType(type){filterType=filterType===type?null:type;searchQuery='';document.getElementById('log-search').value='';applyLogFilter();document.getElementById('err-count').style.opacity=(!filterType||filterType==='ERROR')?'1':'.5';document.getElementById('warn-count').style.opacity=(!filterType||filterType==='WARN')?'1':'.5';}
+function applyLogFilter(){document.getElementById('log').querySelectorAll('.log-line').forEach(function(line){var t=line.querySelector('.log-text');var text=t?t.textContent.toLowerCase():'';var show=true;if(searchQuery)show=text.indexOf(searchQuery)>-1;if(filterType==='ERROR')show=text.indexOf('error')>-1||text.indexOf('exception')>-1;if(filterType==='WARN')show=text.indexOf('warn')>-1;line.style.display=show?'':'none';if(searchQuery&&show)line.classList.add('hl');else line.classList.remove('hl');});}
+function clearSearch(){document.getElementById('log-search').value='';searchQuery='';filterType=null;document.getElementById('err-count').style.opacity='1';document.getElementById('warn-count').style.opacity='1';applyLogFilter();}
+function updateLogCounters(){document.getElementById('err-num').textContent=errCount;document.getElementById('warn-num').textContent=warnCount;}
+function appendLog(text){
+  var shouldScroll=autoScrollEnabled;var pas=document.getElementById('pref-autoscroll');if(pas&&pas.checked===false)shouldScroll=false;
+  var areas=[document.getElementById('log'),document.getElementById('mini-log')];
+  text.split('\n').forEach(function(line){
+    if(!line.trim())return;
+    var join=line.match(/INFO\]?: (.+?) joined the game/),left=line.match(/INFO\]?: (.+?) left the game/);
+    if(join){players.add(join[1].trim());renderPlayers();updatePlayerBadge();}
+    if(left){players.delete(left[1].trim());renderPlayers();updatePlayerBadge();}
+    if(line.indexOf('players online:')>-1)parseList(line);
+    var tpsM=line.match(/TPS from last[^:]*:\s*\*?([\d.]+)/i);if(tpsM)updateStats({tps:tpsM[1]});
+    var isErr=line.indexOf('ERROR')>-1||line.indexOf('Exception')>-1,isWarn=!isErr&&line.indexOf('WARN')>-1;
+    if(isErr){errCount++;updateLogCounters();}if(isWarn){warnCount++;updateLogCounters();}
+    var color='';if(isErr)color='var(--danger)';else if(isWarn)color='var(--warn)';else if(line.charAt(0)==='>')color='var(--accent)';else if(line.indexOf('joined the game')>-1)color='#34d399';else if(line.indexOf('left the game')>-1)color='var(--muted)';else if(line.indexOf('[Panel]')>-1)color='var(--accent2)';else if(line.indexOf('INFO')>-1)color='#6e90aa';
+    areas.forEach(function(area){if(!area)return;logLineCount++;var d=document.createElement('div');d.className='log-line';if(color)d.style.color=color;var num=document.createElement('span');num.className='log-linenum';num.textContent=logLineCount;num.style.display=showLineNumbers?'':'none';d.appendChild(num);var txt=document.createElement('span');txt.className='log-text';txt.textContent=line;d.appendChild(txt);if(searchQuery&&line.toLowerCase().indexOf(searchQuery)>-1)d.classList.add('hl');area.appendChild(d);while(area.childElementCount>MAX_LOG_NODES)area.removeChild(area.firstChild);});
+  });
+  if(shouldScroll)areas.forEach(function(area){if(area)area.scrollTop=area.scrollHeight;});
+}
+function parseList(line){var m=line.match(/players online: (.+)/);players=new Set(m&&m[1].trim()?m[1].split(',').map(function(n){return n.trim();}).filter(function(n){return n&&PLAYER_RE.test(n);}):[]);renderPlayers();updatePlayerBadge();}
+function updatePlayerBadge(){var n=players.size,badge=document.getElementById('players-badge');badge.textContent=n;badge.classList.toggle('show',n>0);document.getElementById('ov-players').textContent=n;document.getElementById('online-count-badge').textContent='('+n+')';document.getElementById('total-online').textContent=n;document.getElementById('hdr-players').textContent=n;}
+function renderPlayers(){
+  var grid=document.getElementById('plist-grid');if(!grid)return;
+  var pf=document.getElementById('player-filter');var filter=(pf?pf.value:'').toLowerCase();
+var list=Array.from(players).filter(function(p){return !filter||p.toLowerCase().indexOf(filter)>-1;});  if(!list.length){grid.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">'+(players.size?'لا نتائج للبحث':'لا يوجد لاعبون متصلون')+'</div>';return;}
+  grid.innerHTML='';
+  list.forEach(function(name){var safe=esc(name),card=document.createElement('div');card.className='player-card';card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name">'+safe+'</div><div class="player-status"><div class="player-online-dot"></div>متصل</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safe+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safe+'">طرد</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safe+'">حظر</button></div></div>';grid.appendChild(card);});
+}
+async function pa(action){var p=document.getElementById('pname').value.trim();if(!p){toast('أدخل اسم اللاعب','err');return;}if(!PLAYER_RE.test(p)){toast('اسم غير صالح','err');return;}await qp(action,p);}
+async function qp(action,player){try{await apiPost('/api/player/'+action,{player:player});toast(action+': '+esc(player));}catch(e){toast(e.message,'err');}}
+function wlAction(a){var name=document.getElementById('wl-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast('اسم غير صالح','err');return;}cmd('whitelist '+a+' '+name);toast('whitelist '+a+': '+name);}
+function opAction(a){var name=document.getElementById('op-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast('اسم غير صالح','err');return;}qp(a,name);}
+function banAction(){var name=document.getElementById('ban-name').value.trim(),reason=document.getElementById('ban-reason').value.trim();if(!name||!PLAYER_RE.test(name)){toast('اسم غير صالح','err');return;}cmd('ban '+name+(reason?' '+reason:''));toast('حظر: '+name);}
+function unbanAction(){var name=document.getElementById('ban-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast('اسم غير صالح','err');return;}qp('unban',name);}
+async function unbanFromList(name){await qp('unban',name);setTimeout(loadBans,600);}
+async function loadOps(){var tb=document.getElementById('ops-body');tb.innerHTML='<tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/ops').then(function(r){return r.json();});document.getElementById('total-ops').textContent=d.ops.length||'0';if(!d.ops.length){tb.innerHTML='<tr class="empty"><td colspan="3">لا يوجد مشرفون</td></tr>';return;}tb.innerHTML='';d.ops.forEach(function(o){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(o.name||'—')+'</span></td><td><span class="badge badge-op">Level '+(o.level||4)+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(o.uuid||'—')+'</td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">فشل التحميل</td></tr>';}}
+async function loadBans(){var tb=document.getElementById('bans-body');tb.innerHTML='<tr class="empty"><td colspan="4">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/bans').then(function(r){return r.json();});document.getElementById('total-banned').textContent=d.bans.length||'0';if(!d.bans.length){tb.innerHTML='<tr class="empty"><td colspan="4">لا يوجد محظورون</td></tr>';return;}tb.innerHTML='';d.bans.forEach(function(b){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(b.name||'—')+'</span></td><td style="font-size:12px;color:var(--danger)">'+esc(b.reason||'—')+'</td><td style="font-size:11px;color:var(--muted)">'+esc(b.created||'—')+'</td><td><button class="act-btn act-ok" data-unban="'+esc(b.name||'')+'">فك الحظر</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="4">فشل التحميل</td></tr>';}}
+async function loadWhitelist(){var tb=document.getElementById('wl-body');tb.innerHTML='<tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/whitelist').then(function(r){return r.json();});document.getElementById('total-players').textContent=d.whitelist.length||'—';if(!d.whitelist.length){tb.innerHTML='<tr class="empty"><td colspan="3">القائمة البيضاء فارغة</td></tr>';return;}tb.innerHTML='';d.whitelist.forEach(function(w){var sn=esc(w.name||'—'),tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+sn+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(w.uuid||'—')+'</td><td><button class="act-btn act-danger" data-wlrm="'+sn+'">إزالة</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">فشل التحميل</td></tr>';}}
+
+// ════════════ FILE MANAGER ════════════
+var allFileItems=[];
+async function loadFiles(relPath){
+  currentFilePath=relPath;
+  var tb=document.getElementById('file-tbody');
+  tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">جارٍ التحميل...</td></tr>';
+  renderBreadcrumb(relPath);
+  try{
+    var r=await fetch('/api/files?path='+encodeURIComponent(relPath));
+    if(!r.ok){var d=await r.json().catch(function(){return{};});tb.innerHTML='<tr class="empty"><td colspan="4">'+esc(d.error||'فشل التحميل')+'</td></tr>';return;}
+    var d=await r.json();allFileItems=d.files||[];renderFileTable(allFileItems,relPath);
+  }catch(e){tb.innerHTML='<tr class="empty"><td colspan="4">فشل الاتصال</td></tr>';}
+}
+function filterFiles(){var q=document.getElementById('file-search').value.toLowerCase();if(!q){renderFileTable(allFileItems,currentFilePath);return;}renderFileTable(allFileItems.filter(function(f){return f.name.toLowerCase().indexOf(q)>-1;}),currentFilePath);}
+function renderFileTable(files,relPath){
+  var tb=document.getElementById('file-tbody');tb.innerHTML='';_files=[];
+  if(!files.length){tb.innerHTML='<tr class="empty"><td colspan="4">المجلد فارغ أو لا نتائج</td></tr>';return;}
+  files.forEach(function(f){
+    var safe=esc(f.name);
+    var fPath=relPath?relPath+'/'+f.name:f.name;
+    var slot=_files.length;_files.push({fPath:fPath,name:f.name,type:f.type});
+    var size=f.type==='dir'?'—':fmtBytes(f.size);
+    var icon=f.type==='dir'?'📁':getFileIcon(f.name);
+    var tr=document.createElement('tr');
+    tr.setAttribute('data-slot',slot);
+    var openBtn=f.type==='dir'?'<button class="act-btn act-ok" data-fa="open">فتح</button>':'<button class="act-btn act-ok" data-fa="edit">تعديل</button>';
+    var dlBtn=f.type==='dir'?'':'<button class="act-btn act-info" data-fa="download">⬇ تنزيل</button>';
+    tr.innerHTML='<td><span class="file-icon">'+icon+'</span><span class="fname">'+safe+'</span></td><td><span class="fsize">'+size+'</span></td><td><span style="font-size:11px;color:var(--muted)">'+(f.type==='dir'?'مجلد':'ملف')+'</span></td><td><div class="act-btns">'+openBtn+dlBtn+'<button class="act-btn act-danger" data-fa="del">حذف</button></div></td>';
+    tb.appendChild(tr);
+  });
+}
+function getFileIcon(name){var ext=name.split('.').pop().toLowerCase(),map={yml:'📄',yaml:'📄',json:'📋',properties:'⚙️',log:'📝',txt:'📝',sh:'⚡',js:'📜',html:'🌐',css:'🎨',zip:'📦',jar:'☕',toml:'📄',conf:'⚙️',md:'📝'};return map[ext]||'📄';}
+function renderBreadcrumb(rel){var bc=document.getElementById('file-breadcrumb');bc.innerHTML='';var root=document.createElement('span');root.className='bc-part';root.textContent='~/SERVER';root.onclick=function(){loadFiles('');};bc.appendChild(root);if(rel){var parts=rel.split('/').filter(Boolean);parts.forEach(function(p,i){var sep=document.createElement('span');sep.className='bc-sep';sep.textContent=' / ';bc.appendChild(sep);var sp=document.createElement('span');sp.className='bc-part';sp.textContent=p;var pp=parts.slice(0,i+1).join('/');sp.onclick=function(){loadFiles(pp);};bc.appendChild(sp);});}}
+async function openFile(relPath,name){try{var r=await fetch('/api/files/read?path='+encodeURIComponent(relPath));if(!r.ok){var d=await r.json();toast(d.error||'فشل الفتح','err');return;}var d=await r.json();currentEditFile=relPath;document.getElementById('editor-filename').textContent=relPath;document.getElementById('file-editor').value=d.content;document.getElementById('file-editor-wrap').style.display='block';document.getElementById('file-editor-wrap').scrollIntoView({behavior:'smooth'});}catch(e){toast(e.message,'err');}}
+async function saveFile(){try{await apiPost('/api/files/write',{path:currentEditFile,content:document.getElementById('file-editor').value});toast('تم الحفظ ✓');}catch(e){toast(e.message,'err');}}
+function closeEditor(){document.getElementById('file-editor-wrap').style.display='none';currentEditFile='';}
+function deleteFile(relPath,name){confirm2('حذف الملف','هل تريد حذف "'+name+'"؟ لا يمكن التراجع.',async function(){try{await apiPost('/api/files/delete',{path:relPath});toast('تم حذف '+name);loadFiles(currentFilePath);}catch(e){toast(e.message,'err');}});}
+function downloadFile(relPath,name){var a=document.createElement('a');a.href='/api/files/download?path='+encodeURIComponent(relPath);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);toast('جارٍ تنزيل '+name);}
+function fileGoUp(){var parts=currentFilePath.split('/').filter(Boolean);parts.pop();loadFiles(parts.join('/'));}
+function fileRefresh(){loadFiles(currentFilePath);}
+async function uploadOneFile(file){
+  try{
+    var buf=await file.arrayBuffer();
+    var r=await fetch('/api/files/upload',{method:'POST',headers:{'x-path':encodeURIComponent(currentFilePath),'x-filename':encodeURIComponent(file.name),'Content-Type':'application/octet-stream'},body:buf});
+    if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.error||'فشل الرفع');}
+    toast('تم رفع '+file.name+' ✓');
+  }catch(e){toast(e.message,'err');}
+}
+async function handleFileUpload(ev){var files=ev.target.files;if(!files||!files.length)return;for(var i=0;i<files.length;i++){await uploadOneFile(files[i]);}ev.target.value='';loadFiles(currentFilePath);}
+
+// ════════════ BACKUPS ════════════
+async function loadBackups(){try{var d=await fetch('/api/backups').then(function(r){return r.json();});backups=d.backups||[];renderBackups();}catch(e){}}
+function renderBackups(){var list=document.getElementById('backup-list');if(!backups.length){list.innerHTML='<div style="text-align:center;color:var(--muted);padding:32px;font-size:13px;">لا توجد نسخ احتياطية بعد</div>';return;}list.innerHTML='';backups.forEach(function(b){var row=document.createElement('div');row.className='backup-row';row.innerHTML='<div><div class="backup-name">📦 '+esc(b.name)+'</div><div class="backup-meta">'+esc(b.date)+' — '+fmtBytes(b.size)+'</div></div><div class="backup-actions"><a class="btn btn-ghost" style="padding:5px 10px;font-size:12px;text-decoration:none;" href="/api/backups/download?name='+encodeURIComponent(b.name)+'" download>⬇ تنزيل</a><button class="btn btn-warn" style="padding:5px 10px;font-size:12px;" data-bkr="'+esc(b.name)+'">↺ استعادة</button><button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" data-bkd="'+esc(b.name)+'">🗑</button></div>';list.appendChild(row);});}
+async function createBackup(){var btns=Array.prototype.slice.call(document.querySelectorAll('[onclick="createBackup()"]'));btns.forEach(function(b){b.disabled=true;b.textContent='جارٍ...';});try{var d=await apiPost('/api/backups/create');toast('تم إنشاء النسخة: '+d.name);loadBackups();}catch(e){toast(e.message,'err');}finally{btns.forEach(function(b){b.disabled=false;b.textContent='+ إنشاء نسخة';});}}
+function restoreBackup(name){confirm2('استعادة النسخة','سيتوقف السيرفر وتُستعاد "'+name+'". لا يمكن التراجع.',async function(){try{await apiPost('/api/backups/restore',{name:name});toast('جارٍ الاستعادة...','warn');}catch(e){toast(e.message,'err');}});}
+function deleteBackup(name){confirm2('حذف النسخة','هل تريد حذف "'+name+'"؟',async function(){try{await apiPost('/api/backups/delete',{name:name});toast('تم الحذف');loadBackups();}catch(e){toast(e.message,'err');}});}
+function setAutoBackup(){var mins=parseInt(document.getElementById('auto-backup-interval').value)||60;if(mins<5){toast('الحد الأدنى 5 دقائق','err');return;}clearInterval(autoBackupInterval);autoBackupInterval=setInterval(function(){if(running){cmd('save-all');setTimeout(function(){createBackup();},3000);}},mins*60000);document.getElementById('auto-backup-status').textContent='مفعّل — كل '+mins+' دقيقة';document.getElementById('auto-backup-status').style.color='var(--accent)';toast('نسخ تلقائي كل '+mins+' دقيقة');}
+function clearAutoBackup(){clearInterval(autoBackupInterval);autoBackupInterval=null;document.getElementById('auto-backup-status').textContent='غير مفعّل';document.getElementById('auto-backup-status').style.color='';toast('تم الإيقاف','warn');}
+
+// ════════════ SETTINGS ════════════
+async function loadProps(){try{var r=await fetch('/api/settings/properties');if(!r.ok)return;var p=(await r.json()).props;var si=function(id,v){var e=document.getElementById(id);if(e&&v!==undefined)e.value=v;};var sc=function(id,v){var e=document.getElementById(id);if(e)e.checked=v==='true';};si('prop-motd',p['motd']);si('prop-maxplayers',p['max-players']);si('prop-port',p['server-port']);si('prop-difficulty',p['difficulty']);si('prop-gamemode',p['gamemode']);si('prop-viewdist',p['view-distance']);si('prop-simdist',p['simulation-distance']);si('prop-idletimeout',p['player-idle-timeout']);sc('prop-pvp',p['pvp']);sc('prop-whitelist',p['white-list']);sc('prop-cmdblocks',p['enable-command-block']);sc('prop-online',p['online-mode']);sc('prop-nether',p['allow-nether']);sc('prop-hardcore',p['hardcore']);}catch(e){}}
+async function applyProps(){var gv=function(id){var e=document.getElementById(id);return e?e.value:'';};var gc=function(id){var e=document.getElementById(id);return e&&e.checked?'true':'false';};var props={'motd':gv('prop-motd'),'max-players':gv('prop-maxplayers'),'server-port':gv('prop-port'),'difficulty':gv('prop-difficulty'),'gamemode':gv('prop-gamemode'),'pvp':gc('prop-pvp'),'white-list':gc('prop-whitelist'),'enable-command-block':gc('prop-cmdblocks'),'online-mode':gc('prop-online'),'allow-nether':gc('prop-nether'),'hardcore':gc('prop-hardcore'),'view-distance':gv('prop-viewdist'),'simulation-distance':gv('prop-simdist'),'player-idle-timeout':gv('prop-idletimeout')};try{await apiPost('/api/settings/properties',{props:props});toast('تم حفظ الإعدادات ✓');}catch(e){toast(e.message,'err');}}
+async function applyStartup(){var cfg={xms:document.getElementById('jvm-xms').value,xmx:document.getElementById('jvm-xmx').value,g1gc:document.getElementById('jvm-g1gc').checked,extraFlags:document.getElementById('jvm-extra').value};try{await apiPost('/api/settings/startup',cfg);toast('تم حفظ إعدادات JVM ✓');}catch(e){toast(e.message,'err');}}
+async function loadStartupSettings(){try{var d=await fetch('/api/settings/startup').then(function(r){return r.json();});var si=function(id,v){var e=document.getElementById(id);if(e)e.value=v;};si('jvm-xms',d.xms);si('jvm-xmx',d.xmx);document.getElementById('jvm-g1gc').checked=!!d.g1gc;si('jvm-extra',d.extraFlags||'');}catch(e){}}
+function applyPanelSettings(){var e=document.getElementById('pref-maxlog');MAX_LOG_NODES=parseInt(e?e.value:'800')||800;var pa=document.getElementById('pref-autoscroll');if(pa)autoScrollEnabled=pa.checked;var pl=document.getElementById('pref-linenum');if(pl)showLineNumbers=pl.checked;toast('تم حفظ الإعدادات ✓');}
+function toggleAutoList(){var on=document.getElementById('pref-autolist').checked;if(on&&running&&!listInterval)listInterval=setInterval(function(){if(running&&wsConnected)cmd('list');},30000);else if(!on){clearInterval(listInterval);listInterval=null;}}
+
+// ════════════ NAV ════════════
+function showPage(name){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});document.getElementById('page-'+name).classList.add('active');var order=['overview','console','players','files','backups','settings'],idx=order.indexOf(name),tabs=Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));if(tabs[idx])tabs[idx].classList.add('active');if(name==='files')loadFiles(currentFilePath);if(name==='backups')loadBackups();if(name==='settings'){loadProps();loadStartupSettings();}if(name==='console'){setTimeout(function(){var a=document.getElementById('log');if(a&&autoScrollEnabled)a.scrollTop=a.scrollHeight;},50);}}
+function showSubTab(page,name){var c=document.getElementById('page-'+page);if(!c)return;c.querySelectorAll('.sub-tab').forEach(function(t){t.classList.remove('active');});c.querySelectorAll('.sub-page').forEach(function(p){p.classList.remove('active');});var st=c.querySelector('.sub-tab[data-sub="'+name+'"]');if(st)st.classList.add('active');var sp=document.getElementById(page+'-'+name);if(sp)sp.classList.add('active');}
+
+// ════════════ TOAST + MODAL ════════════
+var toastTimer=null;
+function toast(msg,type){type=type||'';var t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.className='toast';},2800);}
+function confirm2(title,body,cb){document.getElementById('modal-title').textContent=title;document.getElementById('modal-body').textContent=body;modalCallback=cb;document.getElementById('confirm-modal').classList.add('show');}
+function closeModal(){document.getElementById('confirm-modal').classList.remove('show');modalCallback=null;}
+
+// ════════════ EVENT DELEGATION (the reliable way) ════════════
+document.addEventListener('click',function(e){
+  // Modal confirm
+  if(e.target.id==='modal-confirm'){var cb=modalCallback;closeModal();if(cb)cb();return;}
+  // Modal overlay click to close
+  if(e.target.id==='confirm-modal'){closeModal();return;}
+  // File actions
+  var fb=e.target.closest('[data-fa]');
+  if(fb){var tr=fb.closest('tr[data-slot]');if(tr){var slot=parseInt(tr.getAttribute('data-slot'));var item=_files[slot];if(item){var act=fb.getAttribute('data-fa');if(act==='open')loadFiles(item.fPath);else if(act==='edit')openFile(item.fPath,item.name);else if(act==='del')deleteFile(item.fPath,item.name);else if(act==='download')downloadFile(item.fPath,item.name);}}return;}
+  // Player actions
+  var pb=e.target.closest('[data-pa][data-pn]');
+  if(pb){qp(pb.getAttribute('data-pa'),pb.getAttribute('data-pn'));return;}
+  // Unban
+  var ub=e.target.closest('[data-unban]');
+  if(ub){unbanFromList(ub.getAttribute('data-unban'));return;}
+  // Whitelist remove
+  var wb=e.target.closest('[data-wlrm]');
+  if(wb){var n=wb.getAttribute('data-wlrm');cmd('whitelist remove '+n);toast('إزالة: '+n,'warn');setTimeout(loadWhitelist,600);return;}
+  // Backup restore/delete
+  var br=e.target.closest('[data-bkr]');if(br){restoreBackup(br.getAttribute('data-bkr'));return;}
+  var bd=e.target.closest('[data-bkd]');if(bd){deleteBackup(bd.getAttribute('data-bkd'));return;}
+});
+
+// Keyboard
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();if(e.ctrlKey&&e.key==='l'){e.preventDefault();clearLog();}if(e.ctrlKey&&e.key==='/'){e.preventDefault();showPage('console');setTimeout(function(){var i=document.getElementById('cmdinput');if(i)i.focus();},50);}});
+
+// Scroll tracking
+window.addEventListener('load',function(){var area=document.getElementById('log');if(area)area.addEventListener('scroll',function(){var btn=document.getElementById('scroll-btn');if(!btn)return;var atBottom=area.scrollHeight-area.scrollTop-area.clientHeight<100;btn.classList.toggle('show',!atBottom&&area.scrollHeight>area.clientHeight+100);if(atBottom)autoScrollEnabled=true;});});
+
+// ════════════ THEME ════════════
+function toggleTheme(){
+  var light=document.body.classList.toggle('light-mode');
+  document.getElementById('theme-btn').textContent=light?'☀️':'🌙';
+  try{localStorage.setItem('mc-theme',light?'light':'dark');}catch(e){}
+}
+(function(){
+  try{if(localStorage.getItem('mc-theme')==='light'){document.body.classList.add('light-mode');var btn=document.getElementById('theme-btn');if(btn)btn.textContent='☀️';}}catch(e){}
+})();
+
+// Drag & drop upload
+(function(){var dz=document.getElementById('drop-zone');if(!dz)return;
+  ['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='var(--accent)';});});
+  ['dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='transparent';});});
+  dz.addEventListener('drop',async function(e){var files=e.dataTransfer.files;if(!files||!files.length)return;for(var i=0;i<files.length;i++){await uploadOneFile(files[i]);}loadFiles(currentFilePath);});
+})();
+</script>
+</body>
