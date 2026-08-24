@@ -426,7 +426,7 @@ select.sel:focus{border-color:var(--accent2);}
         </div>
       </div>
 
-      <div class="grid2">
+      <div class="grid3">
         <div class="card">
           <div class="card-header">
             <div class="card-title">الذاكرة RAM</div>
@@ -438,6 +438,18 @@ select.sel:focus{border-color:var(--accent2);}
           </div>
           <div class="progress-wrap"><div class="progress-bar" id="ram-bar" style="width:0%"></div></div>
           <div class="chart-wrap" id="ram-chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">المعالج CPU</div>
+            <span id="cpu-cores" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);">— نواة</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span id="cpu-val" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--num-color);">—%</span>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="cpu-bar" style="width:0%"></div></div>
+          <div class="chart-wrap" id="cpu-chart"></div>
         </div>
 
         <div class="card">
@@ -870,6 +882,7 @@ var players=new Set(), cmdHistory=[], cmdHistIdx=-1;
 var currentFilePath='', currentEditFile='';
 var backups=[], startTime=null, uptimeTimer=null, listInterval=null, autoBackupInterval=null;
 var ramHistory=new Array(20).fill(0);
+var cpuHistory=new Array(20).fill(0);
 var MAX_LOG_NODES=800, modalCallback=null, autoScrollEnabled=true, showLineNumbers=false;
 var searchQuery='', logLineCount=0, errCount=0, warnCount=0, filterType=null;
 var _files=[];
@@ -893,7 +906,7 @@ function initWS(){
   var proto=location.protocol==='https:'?'wss':'ws';
   ws=new WebSocket(proto+'://'+location.host);
   ws.onopen=function(){wsConnected=true;document.getElementById('wsWarn').classList.remove('show');};
-  ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}if(m.type==='log')appendLog(m.data);if(m.type==='status'){setStatus(m.running);if(m.version)setVersion(m.version);}if(m.type==='stats')updateStats(m);if(m.type==='info')setVersion(m.version);};
+  ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}if(m.type==='log')appendLog(m.data);if(m.type==='status'){setStatus(m.running);if(m.version)setVersion(m.version);}if(m.type==='stats')updateStats(m);if(m.type==='info')setVersion(m.version);if(m.type==='players')setPlayers(m.list);};
   ws.onclose=function(){wsConnected=false;document.getElementById('wsWarn').classList.add('show');setTimeout(initWS,3000);};
   ws.onerror=function(){ws.close();};
 }
@@ -925,8 +938,10 @@ function updateUptime(){if(!startTime)return;var s=Math.floor((Date.now()-startT
 function updateStats(m){
   if(m.tps!=null){var tps=parseFloat(m.tps).toFixed(1),color=tps>=18?'var(--accent)':tps>=15?'var(--warn)':'var(--danger)';document.getElementById('ov-tps').textContent=tps;document.getElementById('ov-tps').style.color=color;document.getElementById('info-tps').textContent=tps;document.getElementById('hdr-tps').textContent=tps;document.getElementById('hdr-tps').style.color=color;}
   if(m.ramUsed!=null&&m.ramMax!=null){var pct=Math.round(m.ramUsed/m.ramMax*100);document.getElementById('ram-used').textContent=m.ramUsed+' MB';document.getElementById('ram-max').textContent='/ '+m.ramMax+' MB';document.getElementById('ram-pct').textContent=pct+'%';var bar=document.getElementById('ram-bar');bar.style.width=pct+'%';bar.className='progress-bar'+(pct>85?' danger':pct>65?' warn':'');ramHistory.push(pct);ramHistory.shift();renderRamChart();}
+  if(m.cpu!=null){var cpct=Math.round(m.cpu);document.getElementById('cpu-val').textContent=cpct+'%';var cbar=document.getElementById('cpu-bar');cbar.style.width=Math.min(cpct,100)+'%';cbar.className='progress-bar'+(cpct>85?' danger':cpct>65?' warn':'');if(m.cores!=null)document.getElementById('cpu-cores').textContent=m.cores+' نواة';cpuHistory.push(cpct);cpuHistory.shift();renderCpuChart();}
 }
 function renderRamChart(){var chart=document.getElementById('ram-chart');if(!chart)return;var max=Math.max.apply(null,ramHistory.concat([1]));chart.innerHTML='';ramHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
+function renderCpuChart(){var chart=document.getElementById('cpu-chart');if(!chart)return;var max=Math.max.apply(null,cpuHistory.concat([1]));chart.innerHTML='';cpuHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
 async function apiPost(url,body){body=body||{};var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.error||r.statusText);}return r.json();}
 async function startServer(){try{await apiPost('/api/start');toast('جارٍ التشغيل...');}catch(e){toast(e.message,'err');}}
 async function stopServer(){confirm2('إيقاف السيرفر','سيتوقف السيرفر ويُطرد جميع اللاعبين.',async function(){try{await apiPost('/api/stop');toast('جارٍ الإيقاف...','warn');}catch(e){toast(e.message,'err');}});}
@@ -953,8 +968,6 @@ function appendLog(text){
     var join=line.match(/INFO\]?: (.+?) joined the game/),left=line.match(/INFO\]?: (.+?) left the game/);
     if(join){players.add(join[1].trim());renderPlayers();updatePlayerBadge();}
     if(left){players.delete(left[1].trim());renderPlayers();updatePlayerBadge();}
-    if(line.indexOf('players online:')>-1)parseList(line);
-    var tpsM=line.match(/TPS from last[^:]*:\s*\*?([\d.]+)/i);if(tpsM)updateStats({tps:tpsM[1]});
     var isErr=line.indexOf('ERROR')>-1||line.indexOf('Exception')>-1,isWarn=!isErr&&line.indexOf('WARN')>-1;
     if(isErr){errCount++;updateLogCounters();}if(isWarn){warnCount++;updateLogCounters();}
     var color='';if(isErr)color='var(--danger)';else if(isWarn)color='var(--warn)';else if(line.charAt(0)==='>')color='var(--accent)';else if(line.indexOf('joined the game')>-1)color='#34d399';else if(line.indexOf('left the game')>-1)color='var(--muted)';else if(line.indexOf('[Panel]')>-1)color='var(--accent2)';else if(line.indexOf('INFO')>-1)color='#6e90aa';
@@ -962,7 +975,7 @@ function appendLog(text){
   });
   if(shouldScroll)areas.forEach(function(area){if(area)area.scrollTop=area.scrollHeight;});
 }
-function parseList(line){var m=line.match(/players online: (.+)/);players=new Set(m&&m[1].trim()?m[1].split(',').map(function(n){return n.trim();}).filter(function(n){return n&&PLAYER_RE.test(n);}):[]);renderPlayers();updatePlayerBadge();}
+function setPlayers(list){players=new Set((list||[]).filter(function(n){return n&&PLAYER_RE.test(n);}));renderPlayers();updatePlayerBadge();}
 function updatePlayerBadge(){var n=players.size,badge=document.getElementById('players-badge');badge.textContent=n;badge.classList.toggle('show',n>0);document.getElementById('ov-players').textContent=n;document.getElementById('online-count-badge').textContent='('+n+')';document.getElementById('total-online').textContent=n;document.getElementById('hdr-players').textContent=n;}
 function renderPlayers(){
   var grid=document.getElementById('plist-grid');if(!grid)return;
