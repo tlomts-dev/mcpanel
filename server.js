@@ -16,6 +16,7 @@ const http       = require('http');
 const crypto     = require('crypto');
 const archiver   = require('archiver');
 const unzipper   = require('unzipper');
+const os         = require('os');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PORT        = parseInt(process.env.PORT || '8080', 10);
@@ -101,6 +102,15 @@ let lastTps         = null;
 let mcPid           = null;
 let logTailer       = null;
 let tmuxMonitor     = null;
+let lastCpu         = null;
+let cpuSample       = null; // { utime, stime, time } من آخر قياس، لحساب الفرق
+const CPU_CORES     = os.cpus().length || 1;
+let clkTck = 100;
+try { clkTck = parseInt(execSync('getconf CLK_TCK').toString().trim(), 10) || 100; } catch {}
+
+// أوامر تستخدمها اللوحة داخليًا (قياس TPS وتحديث قائمة اللاعبين)، نخفيها من الكونسول
+// لأن ردّها مو مفيد للمستخدم هناك، والقيمة الفعلية توصل عن طريق بث WebSocket مخصص
+const HIDDEN_COMMANDS = new Set(['tps', 'list']);
 
 const LOG_MAX   = 500;
 const logBuffer = [];
@@ -147,12 +157,15 @@ function getMcPid() {
 
 function sendCommand(cmd) {
   if (!isRunning()) return;
+  const hidden = HIDDEN_COMMANDS.has(cmd.trim().toLowerCase());
   try {
     const safe = cmd.replace(/'/g, "'\\''");
     execSync(`TMUX= tmux send-keys -t ${TMUX_SESSION} '${safe}' Enter`);
-    const echo = `> ${cmd}\n`;
-    pushLog(echo);
-    broadcast({ type: 'log', data: echo });
+    if (!hidden) {
+      const echo = `> ${cmd}\n`;
+      pushLog(echo);
+      broadcast({ type: 'log', data: echo });
+    }
   } catch (e) {
     console.error('[Panel] Failed to send tmux command:', e.message);
   }
@@ -167,7 +180,20 @@ function parseLogLine(line) {
   if (vm) { serverVersion = vm[1].trim(); broadcast({ type: 'info', version: serverVersion }); }
 
   const tpsMatch = line.match(/TPS from last[^:]*:\s*\*?([\d.]+)/i);
-  if (tpsMatch) { lastTps = parseFloat(tpsMatch[1]); broadcast({ type: 'stats', tps: lastTps }); }
+  if (tpsMatch) {
+    lastTps = parseFloat(tpsMatch[1]);
+    broadcast({ type: 'stats', tps: lastTps });
+    return true; // رد أمر tps الداخلي، يبقى مخفي عن الكونسول
+  }
+
+  const listMatch = line.match(/players online:\s*(.*)/i);
+  if (listMatch) {
+    const names = listMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    broadcast({ type: 'players', list: names });
+    return true; // رد أمر list الداخلي، يبقى مخفي عن الكونسول
+  }
+
+  return false;
 }
 
 function startLogTailer() {
@@ -186,9 +212,11 @@ function startLogTailer() {
     logTailer.stdout.on('data', d => {
       const raw  = d.toString();
       const line = stripAnsi(raw);
-      pushLog(line);
-      broadcast({ type: 'log', data: line });
-      parseLogLine(line);
+      const hidden = parseLogLine(line);
+      if (!hidden) {
+        pushLog(line);
+        broadcast({ type: 'log', data: line });
+      }
       checkServerReady(line);
     });
 
@@ -223,6 +251,8 @@ function startTmuxMonitor() {
     serverStartTime = null;
     lastTps         = null;
     mcPid           = null;
+    lastCpu         = null;
+    cpuSample       = null;
     serverReady     = false;
 
     // نظام التشغيل التلقائي إذا كان الإيقاف غير متعمد أو أمر ريستارت
@@ -275,6 +305,8 @@ function startMC() {
   serverStartTime = Date.now();
   lastTps         = null;
   mcPid           = null;
+  lastCpu         = null;
+  cpuSample       = null;
 
   try { fs.writeFileSync(MC_LOG_FILE, ''); } catch {}
 
@@ -690,13 +722,43 @@ const wsPing = setInterval(() => {
 }, 30_000);
 wss.on('close', () => clearInterval(wsPing));
 
-// ── Stats: RAM polling ────────────────────────────────────────────────────────
+// ── Stats: CPU calculation ──────────────────────────────────────────────────
+// نحسب النسبة من فرق وقت المعالج (utime+stime) بين قياسين، مقسوم على عدد الأنوية
+// عشان تكون النتيجة من 0 لـ 100% (نسبة من كامل قدرة الجهاز، مثل Task Manager)
+async function readCpuUsagePct(pid) {
+  const statPath = `/proc/${pid}/stat`;
+  if (!fs.existsSync(statPath)) return null;
+  const txt = await fsp.readFile(statPath, 'utf8');
+  const afterComm = txt.slice(txt.lastIndexOf(')') + 2).trim().split(/\s+/);
+  const utime = parseInt(afterComm[11], 10); // الحقل 14
+  const stime = parseInt(afterComm[12], 10); // الحقل 15
+  if (Number.isNaN(utime) || Number.isNaN(stime)) return null;
+
+  const now = Date.now();
+  const prev = cpuSample;
+  cpuSample = { utime, stime, time: now };
+  if (!prev) return null; // أول قياس، نحتاج قياسين للمقارنة
+
+  const deltaTicks = (utime + stime) - (prev.utime + prev.stime);
+  const deltaMs    = now - prev.time;
+  if (deltaMs <= 0 || deltaTicks < 0) return null;
+
+  const cpuSeconds = deltaTicks / clkTck;
+  const pct = (cpuSeconds / (deltaMs / 1000)) * 100 / CPU_CORES;
+  return Math.max(0, Math.min(100, pct));
+}
+
+// ── Stats: RAM + CPU polling ─────────────────────────────────────────────────
 setInterval(async () => {
   if (!isRunning()) return;
 
   const pid = getMcPid();
   if (!pid) return;
   mcPid = pid;
+
+  let cpuPct = null;
+  try { cpuPct = await readCpuUsagePct(pid); } catch {}
+  if (cpuPct != null) lastCpu = cpuPct;
 
   try {
     const statusPath = `/proc/${pid}/status`;
@@ -707,11 +769,11 @@ setInterval(async () => {
         const ramUsedMB = Math.round(parseInt(rssMatch[1]) / 1024);
         const cfg       = loadStartupCfg();
         const ramMaxMB  = cfg.xmx.endsWith('G') ? parseInt(cfg.xmx) * 1024 : parseInt(cfg.xmx);
-        broadcast({ type: 'stats', ramUsed: ramUsedMB, ramMax: ramMaxMB, tps: lastTps });
+        broadcast({ type: 'stats', ramUsed: ramUsedMB, ramMax: ramMaxMB, tps: lastTps, cpu: lastCpu, cores: CPU_CORES });
       }
     }
   } catch {}
-}, 5000);
+}, 1000);
 
 // ── TPS polling ─────────────────────
 let serverReady    = false;
