@@ -36,7 +36,7 @@ const USERS = { [ADMIN_USER]: ADMIN_HASH };
 if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
 // ── Validation ────────────────────────────────────────────────────────────────
-const PLAYER_RE     = /^[a-zA-Z0-9_]{1,16}$/;
+const PLAYER_RE     = /^\.?[a-zA-Z0-9_]{1,16}$/;
 const CMD_BLACKLIST = /[;&|`$(){}[\]<>\\]/;
 
 function sanitizeCommand(cmd) {
@@ -188,8 +188,13 @@ function parseLogLine(line) {
 
   const listMatch = line.match(/players online:\s*(.*)/i);
   if (listMatch) {
-    const names = listMatch[1].split(',').map(s => s.trim()).filter(Boolean);
-    broadcast({ type: 'players', list: names });
+    const players = listMatch[1].split(',').map(s => {
+      const display = s.trim();
+      const parts = display.split(/\s+/).filter(Boolean);
+      const name = parts.length ? parts[parts.length - 1] : '';
+      return { name, display };
+    }).filter(p => p.name);
+    broadcast({ type: 'players', list: players });
     return true; // رد أمر list الداخلي، يبقى مخفي عن الكونسول
   }
 
@@ -712,6 +717,8 @@ wss.on('connection', ws => {
 
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
+
+  if (isRunning() && serverReady) sendCommand('list');
 });
 
 const wsPing = setInterval(() => {
