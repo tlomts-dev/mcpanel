@@ -876,9 +876,9 @@ select.sel:focus{border-color:var(--accent2);}
 
 <script>
 'use strict';
-var PLAYER_RE = /^[a-zA-Z0-9_]{1,16}$/;
+var PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/;
 var ws=null, wsConnected=false, running=false;
-var players=new Set(), cmdHistory=[], cmdHistIdx=-1;
+var players=new Map(), cmdHistory=[], cmdHistIdx=-1;
 var currentFilePath='', currentEditFile='';
 var backups=[], startTime=null, uptimeTimer=null, listInterval=null, autoBackupInterval=null;
 var ramHistory=new Array(20).fill(0);
@@ -966,7 +966,7 @@ function appendLog(text){
   text.split('\n').forEach(function(line){
     if(!line.trim())return;
     var join=line.match(/INFO\]?: (.+?) joined the game/),left=line.match(/INFO\]?: (.+?) left the game/);
-    if(join){players.add(join[1].trim());renderPlayers();updatePlayerBadge();}
+    if(join){players.set(join[1].trim(),join[1].trim());renderPlayers();updatePlayerBadge();}
     if(left){players.delete(left[1].trim());renderPlayers();updatePlayerBadge();}
     var isErr=line.indexOf('ERROR')>-1||line.indexOf('Exception')>-1,isWarn=!isErr&&line.indexOf('WARN')>-1;
     if(isErr){errCount++;updateLogCounters();}if(isWarn){warnCount++;updateLogCounters();}
@@ -975,14 +975,15 @@ function appendLog(text){
   });
   if(shouldScroll)areas.forEach(function(area){if(area)area.scrollTop=area.scrollHeight;});
 }
-function setPlayers(list){players=new Set((list||[]).filter(function(n){return n&&PLAYER_RE.test(n);}));renderPlayers();updatePlayerBadge();}
+function setPlayers(list){players=new Map((list||[]).filter(function(p){return p&&p.name&&PLAYER_RE.test(p.name);}).map(function(p){return [p.name,p.display||p.name];}));renderPlayers();updatePlayerBadge();}
 function updatePlayerBadge(){var n=players.size,badge=document.getElementById('players-badge');badge.textContent=n;badge.classList.toggle('show',n>0);document.getElementById('ov-players').textContent=n;document.getElementById('online-count-badge').textContent='('+n+')';document.getElementById('total-online').textContent=n;document.getElementById('hdr-players').textContent=n;}
 function renderPlayers(){
   var grid=document.getElementById('plist-grid');if(!grid)return;
   var pf=document.getElementById('player-filter');var filter=(pf?pf.value:'').toLowerCase();
-var list=Array.from(players).filter(function(p){return !filter||p.toLowerCase().indexOf(filter)>-1;});  if(!list.length){grid.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">'+(players.size?'لا نتائج للبحث':'لا يوجد لاعبون متصلون')+'</div>';return;}
+  var list=Array.from(players.entries()).filter(function(e){return !filter||e[0].toLowerCase().indexOf(filter)>-1||e[1].toLowerCase().indexOf(filter)>-1;});
+  if(!list.length){grid.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">'+(players.size?'لا نتائج للبحث':'لا يوجد لاعبون متصلون')+'</div>';return;}
   grid.innerHTML='';
-  list.forEach(function(name){var safe=esc(name),card=document.createElement('div');card.className='player-card';card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name">'+safe+'</div><div class="player-status"><div class="player-online-dot"></div>متصل</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safe+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safe+'">طرد</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safe+'">حظر</button></div></div>';grid.appendChild(card);});
+  list.forEach(function(entry){var name=entry[0],display=entry[1],safeName=esc(name),safeDisplay=esc(display),card=document.createElement('div');card.className='player-card';card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name">'+safeDisplay+'</div><div class="player-status"><div class="player-online-dot"></div>متصل</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safeName+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safeName+'">طرد</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safeName+'">حظر</button></div></div>';grid.appendChild(card);});
 }
 async function pa(action){var p=document.getElementById('pname').value.trim();if(!p){toast('أدخل اسم اللاعب','err');return;}if(!PLAYER_RE.test(p)){toast('اسم غير صالح','err');return;}await qp(action,p);}
 async function qp(action,player){try{await apiPost('/api/player/'+action,{player:player});toast(action+': '+esc(player));}catch(e){toast(e.message,'err');}}
