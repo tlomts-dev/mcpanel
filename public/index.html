@@ -27,8 +27,9 @@ body.light-mode select.sel{background:#f5f7fa;}
 body.light-mode #login-screen{background:radial-gradient(ellipse at 50% -20%,#00e87a18 0%,transparent 65%);}
 body.light-mode .login-box input{background:#f0f2f5;}
 body.light-mode .console-search input{background:#f5f7fa;color:var(--text);}
+body.light-mode .file-menu{box-shadow:0 12px 30px #00000022;}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'Tajawal',sans-serif;min-height:100vh;overflow-x:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Tajawal',sans-serif;min-height:100vh;overflow-x:hidden;overflow-anchor:none;}
 
 /* ── Login ── */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% -20%,#00e87a12 0%,transparent 65%);}
@@ -130,9 +131,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:700;letter-spacing:.5px;}
 .field{margin-bottom:14px;}
 
-/* ══════════════════════════════════════
-   FIX 1: Console log – LTR direction
-   ══════════════════════════════════════ */
+/* ── Console ── */
 .console-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .console-toolbar-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .console-search{position:relative;flex:1;min-width:160px;}
@@ -140,27 +139,23 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
   background:#060810;border:1px solid var(--border);color:var(--text);
   padding:7px 32px 7px 12px;border-radius:var(--radius);font-size:12px;
   font-family:'IBM Plex Mono',monospace;outline:none;width:100%;transition:.2s;
-  direction:ltr; /* FIX: search box LTR */
+  direction:ltr;
 }
 .console-search input:focus{border-color:var(--accent2);}
 .search-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;}
 .search-clear:hover{color:var(--text);}
+.btn-ghost.active-toggle{color:var(--accent);border-color:var(--accent);}
 
-/* Log counter badges */
 .log-counters{display:flex;align-items:center;gap:5px;}
 .log-count{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:.15s;}
 .log-count.err{background:#f43f5e18;border:1px solid #f43f5e40;color:var(--danger);}
 .log-count.warn{background:#f59e0b18;border:1px solid #f59e0b40;color:var(--warn);}
 .log-count:hover{filter:brightness(1.2);}
 
-/* ══════════════════════════════════════
-   FIX 1 (continued): LTR log area
-   ══════════════════════════════════════ */
 .log-area{
   background:#04060a;border:1px solid var(--border);border-radius:var(--radius);
   height:440px;overflow-y:auto;padding:14px;
   font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.75;color:#6e90aa;
-  /* FIX: Force LTR for log content */
   direction:ltr;
   text-align:left;
   unicode-bidi:embed;
@@ -173,7 +168,6 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
 .log-linenum{flex-shrink:0;color:var(--muted);font-size:10px;user-select:none;min-width:32px;text-align:right;}
 .log-text{flex:1;word-break:break-all;}
 
-/* Scroll-to-bottom button */
 .scroll-to-bottom{
   position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
   background:var(--surface2);border:1px solid var(--border2);color:var(--text2);
@@ -184,13 +178,12 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
 .scroll-to-bottom.show{display:block;}
 .console-wrap{position:relative;}
 
-/* FIX 1: Console input LTR */
 .cmd-row{display:flex;gap:8px;margin-top:10px;}
 .cmd-row input{
   flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);
   padding:10px 14px;border-radius:var(--radius);font-size:13px;
   font-family:'IBM Plex Mono',monospace;outline:none;transition:.2s;
-  direction:ltr; /* FIX: command input LTR */
+  direction:ltr;
   text-align:left;
 }
 .cmd-row input:focus{border-color:var(--accent);}
@@ -215,6 +208,7 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
 .pname{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:13px;}
 .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;}
 .badge-on{background:#00e87a18;color:var(--accent);border:1px solid #00e87a30;}
+.badge-off{background:#47556918;color:var(--muted);border:1px solid #47556930;}
 .badge-op{background:#f59e0b18;color:var(--warn);border:1px solid #f59e0b30;}
 .badge-ban{background:#f43f5e18;color:var(--danger);border:1px solid #f43f5e30;}
 .act-btns{display:flex;gap:4px;flex-wrap:wrap;}
@@ -228,10 +222,10 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
 .act-info:hover{background:var(--info);color:#000;}
 .act-danger:hover{background:var(--danger);color:#000;}
 
-/* ── Player cards (Falix-style) ── */
+/* ── Player cards ── */
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:4px;}
-.player-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:12px;transition:.15s;cursor:default;}
-.player-card:hover{border-color:var(--border2);}
+.player-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:12px;transition:.15s;cursor:pointer;}
+.player-card:hover{border-color:var(--accent2);}
 .player-avatar{width:36px;height:36px;border-radius:4px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .player-info{flex:1;min-width:0;}
 .player-name{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -247,14 +241,11 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
 .sub-page{display:none;}
 .sub-page.active{display:block;}
 
-/* ══════════════════════════════════════
-   FIX 3: File manager
-   ══════════════════════════════════════ */
+/* ── File manager ── */
 .breadcrumb{
   display:flex;align-items:center;gap:4px;
   font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);
   margin-bottom:12px;flex-wrap:wrap;
-  /* FIX: breadcrumb paths are LTR */
   direction:ltr;text-align:left;
 }
 .breadcrumb .bc-part{cursor:pointer;color:var(--accent2);}
@@ -272,10 +263,16 @@ textarea.editor{
   width:100%;height:420px;background:#04060a;border:1px solid var(--border);
   color:#93c5fd;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;
   padding:14px;border-radius:var(--radius);outline:none;resize:vertical;
-  /* FIX: editor always LTR */
   direction:ltr;text-align:left;
 }
 textarea.editor:focus{border-color:var(--accent);}
+tr.file-row, tr.player-row{cursor:pointer;}
+.kebab-btn{background:transparent;border:1px solid var(--border);color:var(--muted);width:28px;height:28px;border-radius:5px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0;}
+.kebab-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+.file-menu{position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px;min-width:150px;z-index:600;box-shadow:0 12px 30px #00000066;}
+.file-menu-item{padding:8px 12px;font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap;color:var(--text2);}
+.file-menu-item:hover{background:var(--surface3);color:var(--accent2);}
+.file-menu-item.danger:hover{background:var(--surface3);color:var(--danger);}
 
 /* ── Backups ── */
 .backup-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;flex-wrap:wrap;gap:8px;transition:.15s;}
@@ -293,17 +290,21 @@ textarea.editor:focus{border-color:var(--accent);}
 .setting-name{font-size:14px;font-weight:700;}
 .setting-desc{font-size:11px;color:var(--muted);margin-top:2px;}
 .setting-control{margin-right:20px;}
-.toggle{position:relative;width:42px;height:22px;display:inline-block;}
+.toggle{position:relative;width:42px;height:22px;display:inline-block;flex-shrink:0;}
 .toggle input{opacity:0;width:0;height:0;}
 .toggle-slider{position:absolute;inset:0;background:var(--muted2);border-radius:22px;cursor:pointer;transition:.2s;}
 .toggle-slider::before{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;right:3px;transition:.2s;}
 .toggle input:checked+.toggle-slider{background:var(--accent);}
 .toggle input:checked+.toggle-slider::before{right:auto;left:3px;}
-select.sel{background:#060810;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--radius);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;cursor:pointer;transition:.2s;}
+select.sel{background:#060810;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--radius);font-size:13px;font-family:'Tajawal',sans-serif;outline:none;cursor:pointer;transition:.2s;width:100%;}
 select.sel:focus{border-color:var(--accent2);}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px;}
 .quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:'Tajawal',sans-serif;transition:.15s;text-align:center;}
 .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
+.advprop-row{display:grid;grid-template-columns:minmax(90px,160px) 1fr auto;gap:8px;margin-bottom:8px;align-items:center;}
+.advprop-row .adv-key-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);background:var(--surface3);padding:9px 10px;border-radius:6px;direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--border);}
+.advprop-row .adv-key-input{direction:ltr;font-family:'IBM Plex Mono',monospace;font-size:11px;}
+.advprop-row .adv-val{direction:ltr;font-family:'IBM Plex Mono',monospace;font-size:12px;}
 
 /* ── Filter bar ── */
 .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
@@ -316,12 +317,51 @@ select.sel:focus{border-color:var(--accent2);}
 .toast.warn{border-color:var(--warn);color:var(--warn);}
 
 /* ── Modal ── */
-.modal-overlay{position:fixed;inset:0;background:#00000099;z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.modal-overlay{position:fixed;inset:0;background:#00000099;z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);padding:20px;}
 .modal-overlay.show{display:flex;}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:28px;width:460px;max-width:95vw;box-shadow:0 24px 60px #00000066;}
 .modal h3{font-size:17px;font-weight:900;margin-bottom:8px;}
 .modal p{color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.6;}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+
+/* ── Player detail modal ── */
+.pd-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;flex-wrap:wrap;gap:10px;}
+.pd-head-left{display:flex;align-items:center;gap:12px;}
+.pd-avatar{width:44px;height:44px;border-radius:7px;image-rendering:pixelated;background:var(--surface2);border:1px solid var(--border);}
+.pd-name{font-size:18px;font-weight:900;}
+.pd-status{font-size:11px;color:var(--muted);margin-top:2px;}
+.pd-bar-row{margin-bottom:14px;}
+.pd-bar-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:5px;}
+.pd-loc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:12px;flex-wrap:wrap;}
+.pd-loc-coords{font-family:'IBM Plex Mono',monospace;direction:ltr;color:var(--accent2);}
+.pd-loc-meta{color:var(--muted);font-size:11px;}
+.pd-empty{text-align:center;color:var(--muted);padding:28px 10px;font-size:13px;line-height:1.7;}
+.mc-frame{background:#c6c6c6;border-radius:3px;padding:10px;box-shadow:inset -2px -2px 0 #373737,inset 2px 2px 0 #fff,inset -4px -4px 0 #8b8b8b,inset 4px 4px 0 #f5f5f5;margin-bottom:18px;}
+.mc-inv-layout{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;}
+.mc-armor-col{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;width:auto;}
+@media(max-width:420px){.mc-armor-col{grid-template-columns:repeat(2,1fr);}}
+.mc-main-slots{flex:1;min-width:220px;}
+.mc-slot-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;}
+.mc-hotbar-sep{height:6px;}
+.mc-slot{background:#8b8b8b;box-shadow:inset -2px -2px 0 #373737,inset 2px 2px 0 #fff;aspect-ratio:1;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:28px;}
+.mc-slot.mc-slot-empty{cursor:default;}
+.mc-slot img{width:78%;height:78%;image-rendering:pixelated;object-fit:contain;}
+.mc-slot .mc-emoji-fb{display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:14px;}
+.mc-slot .mc-count{position:absolute;bottom:0;left:2px;color:#fff;font-size:11px;font-weight:900;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.mc-slot .mc-dura-bar{position:absolute;bottom:1.5px;left:1.5px;right:1.5px;height:2px;background:#3d0a0a;}
+.mc-slot .mc-dura-fill{height:100%;background:#7fd13b;}
+.mc-tooltip{position:fixed;background:#100010ee;border:2px solid #2d0a5e;border-radius:2px;padding:8px 10px;z-index:700;max-width:220px;box-shadow:0 8px 20px #000000aa;}
+.mc-tooltip .mc-tt-name{color:#fff;font-weight:700;font-size:13px;margin-bottom:4px;}
+.mc-tooltip.mc-tt-ench .mc-tt-name{color:#5fdcff;}
+.mc-tooltip .mc-tt-ench-line{color:#aa7fff;font-size:11px;line-height:1.6;}
+.mc-tooltip .mc-tt-dura{color:#bbb;font-size:11px;margin-top:4px;}
+.pd-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+@media(max-width:520px){.pd-stat-grid{grid-template-columns:1fr 1fr;}}
+.pd-stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center;}
+.pd-stat-num{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;color:var(--num-color);}
+.pd-stat-lbl{font-size:9.5px;color:var(--muted);margin-top:3px;}
+.pd-mined-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--muted2);}
+.pd-mined-row:last-child{border-bottom:none;}
 
 /* ── Disk bar ── */
 .disk-labels{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:6px;}
@@ -333,8 +373,8 @@ select.sel:focus{border-color:var(--accent2);}
 .info-val{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);direction:ltr;}
 
 /* ── Total players stats card ── */
-.players-summary{display:flex;gap:10px;margin-bottom:14px;}
-.players-summary-card{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;}
+.players-summary{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.players-summary-card{flex:1;min-width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;}
 .players-summary-num{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:var(--num-color);}
 .players-summary-label{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
 
@@ -530,14 +570,14 @@ select.sel:focus{border-color:var(--accent2);}
           </div>
           <div class="console-toolbar-right">
             <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="toggleLineNumbers()" id="linenum-btn">## أرقام</button>
-            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="toggleAutoScroll()" id="autoscroll-btn">↓ تلقائي</button>
+            <button class="btn btn-ghost active-toggle" style="padding:5px 10px;font-size:11px;" onclick="toggleAutoScroll()" id="autoscroll-btn">↓ تلقائي</button>
             <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="clearLog()">مسح</button>
             <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="downloadLog()">⬇ تنزيل</button>
           </div>
         </div>
         <div class="console-wrap">
           <div class="log-area" id="log"></div>
-          <button class="scroll-to-bottom" id="scroll-btn" onclick="scrollToBottom()">↓ اذهب للأسفل</button>
+          <button class="scroll-to-bottom" id="scroll-btn" onclick="jumpToBottom()">↓ اذهب للأسفل</button>
         </div>
         <div class="cmd-row">
           <input type="text" id="cmdinput" placeholder="Server command... (↑↓ history)" maxlength="256" onkeydown="handleCmdKey(event)">
@@ -584,6 +624,7 @@ select.sel:focus{border-color:var(--accent2);}
 
       <div class="sub-tabs">
         <div class="sub-tab active" data-sub="online" onclick="showSubTab('players','online')">🟢 متصلون <span id="online-count-badge" style="font-size:10px;color:var(--muted);">(0)</span></div>
+        <div class="sub-tab" data-sub="all" onclick="showSubTab('players','all');loadAllPlayers()">📜 كل اللاعبين</div>
         <div class="sub-tab" data-sub="whitelist" onclick="showSubTab('players','whitelist');loadWhitelist()">📋 Whitelist</div>
         <div class="sub-tab" data-sub="ops" onclick="showSubTab('players','ops');loadOps()">⭐ المشرفون</div>
         <div class="sub-tab" data-sub="banned" onclick="showSubTab('players','banned');loadBans()">🚫 المحظورون</div>
@@ -605,9 +646,26 @@ select.sel:focus{border-color:var(--accent2);}
             <button class="btn btn-warn" onclick="pa('kick')">طرد</button>
             <button class="btn btn-danger" onclick="pa('ban')">حظر</button>
           </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">انقر على أي بطاقة لاعب لعرض مخزونه وموقعه وإحصائياته.</div>
           <div class="player-grid" id="plist-grid">
             <div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">لا يوجد لاعبون متصلون</div>
           </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="players-all">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">كل من دخل السيرفر</div>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="loadAllPlayers()">↻ تحديث</button>
+          </div>
+          <div class="filter-bar">
+            <input class="inp" id="allplayers-filter" placeholder="بحث بالاسم..." style="max-width:220px;" oninput="renderAllPlayersTable()">
+          </div>
+          <table class="mc-table">
+            <thead><tr><th>اللاعب</th><th>الحالة</th><th>أول ظهور</th><th>آخر ظهور</th><th>مرات الدخول</th></tr></thead>
+            <tbody id="allplayers-body"><tr class="empty"><td colspan="5">جارٍ التحميل...</td></tr></tbody>
+          </table>
         </div>
       </div>
 
@@ -688,8 +746,9 @@ select.sel:focus{border-color:var(--accent2);}
           <button class="btn btn-primary" onclick="document.getElementById('file-upload-input').click()">⬆ رفع ملف</button>
           <input type="file" id="file-upload-input" style="display:none" multiple onchange="handleFileUpload(event)">
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">انقر على أي ملف لفتحه وتعديله مباشرة، أو مجلد للدخول إليه. زر ⋮ فيه أيضاً: تعديل، تنزيل، إعادة تسمية، حذف.</div>
         <table class="mc-table">
-          <thead><tr><th>الاسم</th><th>الحجم</th><th>النوع</th><th>الإجراءات</th></tr></thead>
+          <thead><tr><th>الاسم</th><th>الحجم</th><th>النوع</th><th style="width:40px;"></th></tr></thead>
           <tbody id="file-tbody"></tbody>
         </table>
       </div>
@@ -743,52 +802,10 @@ select.sel:focus{border-color:var(--accent2);}
             <div class="card-title">server.properties</div>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-ghost" onclick="loadProps()">↻ تحميل</button>
-              <button class="btn btn-primary" onclick="applyProps()">💾 حفظ</button>
+              <button class="btn btn-primary" onclick="applyProps()">💾 حفظ الكل</button>
             </div>
           </div>
-          <div class="settings-group">
-            <div class="settings-group-title">معلومات عامة</div>
-            <div class="field"><label class="lbl">MOTD (اسم السيرفر)</label><input class="inp" id="prop-motd" placeholder="A Minecraft Server"></div>
-            <div class="grid2">
-              <div class="field"><label class="lbl">الحد الأقصى للاعبين</label><input class="inp" id="prop-maxplayers" type="number" min="1" max="1000" value="20"></div>
-              <div class="field"><label class="lbl">منفذ السيرفر</label><input class="inp" id="prop-port" type="number" value="25565" style="direction:ltr;"></div>
-            </div>
-            <div class="grid2">
-              <div class="field"><label class="lbl">الصعوبة</label>
-                <select class="sel" id="prop-difficulty" style="width:100%">
-                  <option value="peaceful">Peaceful</option>
-                  <option value="easy">Easy</option>
-                  <option value="normal" selected>Normal</option>
-                  <option value="hard">Hard</option>
-                </select>
-              </div>
-              <div class="field"><label class="lbl">نمط اللعبة الافتراضي</label>
-                <select class="sel" id="prop-gamemode" style="width:100%">
-                  <option value="survival" selected>Survival</option>
-                  <option value="creative">Creative</option>
-                  <option value="adventure">Adventure</option>
-                  <option value="spectator">Spectator</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="settings-group">
-            <div class="settings-group-title">خيارات اللعب</div>
-            <div class="setting-row"><div class="setting-info"><div class="setting-name">PvP</div><div class="setting-desc">السماح بالقتال بين اللاعبين</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-pvp" checked><span class="toggle-slider"></span></label></div></div>
-            <div class="setting-row"><div class="setting-info"><div class="setting-name">Whitelist</div><div class="setting-desc">تقييد الدخول بقائمة محددة</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-whitelist"><span class="toggle-slider"></span></label></div></div>
-            <div class="setting-row"><div class="setting-info"><div class="setting-name">Command Blocks</div><div class="setting-desc">تفعيل بلوكات الأوامر</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-cmdblocks"><span class="toggle-slider"></span></label></div></div>
-            <div class="setting-row"><div class="setting-info"><div class="setting-name">Online Mode</div><div class="setting-desc">التحقق من حسابات Mojang</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-online" checked><span class="toggle-slider"></span></label></div></div>
-            <div class="setting-row"><div class="setting-info"><div class="setting-name">Nether</div><div class="setting-desc">تفعيل عالم الـ Nether</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-nether" checked><span class="toggle-slider"></span></label></div></div>
-            <div class="setting-row"><div class="setting-info"><div class="setting-name">Hardcore Mode</div><div class="setting-desc">الموت النهائي</div></div><div class="setting-control"><label class="toggle"><input type="checkbox" id="prop-hardcore"><span class="toggle-slider"></span></label></div></div>
-          </div>
-          <div class="settings-group">
-            <div class="settings-group-title">الأداء</div>
-            <div class="grid2">
-              <div class="field"><label class="lbl">View Distance (chunks)</label><input class="inp" id="prop-viewdist" type="number" min="2" max="32" value="10"></div>
-              <div class="field"><label class="lbl">Simulation Distance (chunks)</label><input class="inp" id="prop-simdist" type="number" min="2" max="16" value="10"></div>
-            </div>
-            <div class="field"><label class="lbl">وقت الخمول قبل الطرد (دقائق، 0=معطّل)</label><input class="inp" id="prop-idletimeout" type="number" min="0" value="0"></div>
-          </div>
+          <div id="props-container"><div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">جارٍ التحميل...</div></div>
         </div>
       </div>
 
@@ -797,7 +814,7 @@ select.sel:focus{border-color:var(--accent2);}
           <div class="card-title" style="margin-bottom:16px;">إعدادات JVM</div>
           <div class="grid2">
             <div class="field"><label class="lbl">الحد الأدنى (Xms)</label>
-              <select class="sel" id="jvm-xms" style="width:100%">
+              <select class="sel" id="jvm-xms">
                 <option value="512M">512 MB</option>
                 <option value="1G" selected>1 GB</option>
                 <option value="2G">2 GB</option>
@@ -805,12 +822,8 @@ select.sel:focus{border-color:var(--accent2);}
               </select>
             </div>
             <div class="field"><label class="lbl">الحد الأقصى (Xmx)</label>
-              <select class="sel" id="jvm-xmx" style="width:100%">
-                <option value="2G" selected>2 GB</option>
-                <option value="4G">4 GB</option>
-                <option value="6G">6 GB</option>
-                <option value="8G">8 GB</option>
-              </select>
+              <select class="sel" id="jvm-xmx"></select>
+              <div id="jvm-xmx-hint" style="font-size:10px;color:var(--muted);margin-top:5px;"></div>
             </div>
           </div>
           <div class="setting-row">
@@ -834,7 +847,7 @@ select.sel:focus{border-color:var(--accent2);}
           </div>
           <div class="setting-row">
             <div class="setting-info"><div class="setting-name">التمرير التلقائي للكونسول</div><div class="setting-desc">يبقى في الأسفل دائماً</div></div>
-            <div class="setting-control"><label class="toggle"><input type="checkbox" id="pref-autoscroll" checked><span class="toggle-slider"></span></label></div>
+            <div class="setting-control"><label class="toggle"><input type="checkbox" id="pref-autoscroll" checked onchange="setAutoScroll(this.checked)"><span class="toggle-slider"></span></label></div>
           </div>
           <div class="setting-row">
             <div class="setting-info"><div class="setting-name">أرقام الأسطر في الكونسول</div><div class="setting-desc">عرض رقم كل سطر</div></div>
@@ -860,6 +873,32 @@ select.sel:focus{border-color:var(--accent2);}
       </div>
     </div>
 
+    <div class="page" id="page-player-detail">
+      <div class="card">
+        <div class="pd-head">
+          <button class="btn btn-ghost" onclick="showPage('players')">→ رجوع لكل اللاعبين</button>
+          <div class="pd-head-left">
+            <div style="text-align:left;">
+              <div class="pd-name" id="pd-name">—</div>
+              <div class="pd-status" id="pd-status">—</div>
+            </div>
+            <img class="pd-avatar" id="pd-avatar" src="" alt="" onerror="this.style.visibility='hidden'">
+          </div>
+        </div>
+        <div class="sub-tabs" style="margin-top:16px;">
+          <div class="sub-tab active" data-pdt="health" onclick="showPdTab('health')">❤️ الصحة والخبرة</div>
+          <div class="sub-tab" data-pdt="inventory" onclick="showPdTab('inventory')">🎒 المخزون</div>
+          <div class="sub-tab" data-pdt="enderchest" onclick="showPdTab('enderchest')">🔮 الصندوق السحري</div>
+          <div class="sub-tab" data-pdt="info" onclick="showPdTab('info')">📍 معلومات</div>
+          <div class="sub-tab" data-pdt="stats" onclick="showPdTab('stats')">📊 الإحصائيات</div>
+          <div class="sub-tab" data-pdt="deaths" onclick="showPdTab('deaths')">💀 أماكن الموت</div>
+          <div class="sub-tab" data-pdt="teleports" onclick="showPdTab('teleports')">🌀 أماكن الانتقال</div>
+          <div class="sub-tab" data-pdt="delete" onclick="showPdTab('delete')">🗑 حذف البيانات</div>
+        </div>
+        <div id="pd-body" style="margin-top:16px;min-height:300px;"></div>
+      </div>
+    </div>
+
   </div></div><div class="toast" id="toast"></div>
 
 <div class="modal-overlay" id="confirm-modal">
@@ -869,6 +908,17 @@ select.sel:focus{border-color:var(--accent2);}
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
       <button class="btn btn-danger" id="modal-confirm">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="prompt-modal">
+  <div class="modal">
+    <h3 id="prompt-title">إدخال</h3>
+    <input class="inp" id="prompt-input" style="margin-bottom:20px;" onkeydown="if(event.key==='Enter')document.getElementById('prompt-confirm').click();">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePromptModal()">إلغاء</button>
+      <button class="btn btn-primary" id="prompt-confirm">تأكيد</button>
     </div>
   </div>
 </div>
@@ -883,12 +933,19 @@ var currentFilePath='', currentEditFile='';
 var backups=[], startTime=null, uptimeTimer=null, listInterval=null, autoBackupInterval=null;
 var ramHistory=new Array(20).fill(0);
 var cpuHistory=new Array(20).fill(0);
-var MAX_LOG_NODES=800, modalCallback=null, autoScrollEnabled=true, showLineNumbers=false;
+var MAX_LOG_NODES=800, modalCallback=null, promptCallback=null, autoScrollEnabled=true, showLineNumbers=false;
 var searchQuery='', logLineCount=0, errCount=0, warnCount=0, filterType=null;
-var _files=[];
+var _files=[], openMenuSlot=null, _lastTooltipIdx=null;
+var allPlayersData=[];
+var pdCurrent=null, pdCurrentName=null, pdActiveTab='health';
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function fmtBytes(b){return b==null?'—':b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':b<1073741824?(b/1048576).toFixed(1)+'MB':(b/1073741824).toFixed(2)+'GB';}
+function fmtDate(ms){if(!ms)return '—';var d=new Date(ms);var p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function fmtAgo(ms){if(!ms)return '—';var diff=Date.now()-ms,m=Math.floor(diff/60000);if(m<1)return 'الآن';if(m<60)return 'قبل '+m+' د';var h=Math.floor(m/60);if(h<24)return 'قبل '+h+' س';var dd=Math.floor(h/24);return 'قبل '+dd+' يوم';}
+function fmtPlaytime(ticks){var totalSec=Math.floor((ticks||0)/20),h=Math.floor(totalSec/3600),m=Math.floor((totalSec%3600)/60);return h+'س '+m+'د';}
+function fmtDist(meters){meters=meters||0;if(meters>=1000)return (meters/1000).toFixed(1)+' كم';return Math.round(meters)+' م';}
+function copyText(t){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('تم النسخ ✓');}).catch(function(){toast('تعذّر النسخ','err');});}
 
 async function login(){
   var btn=document.getElementById('loginBtn'),err=document.getElementById('lerr');
@@ -906,7 +963,15 @@ function initWS(){
   var proto=location.protocol==='https:'?'wss':'ws';
   ws=new WebSocket(proto+'://'+location.host);
   ws.onopen=function(){wsConnected=true;document.getElementById('wsWarn').classList.remove('show');};
-  ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}if(m.type==='log')appendLog(m.data);if(m.type==='status'){setStatus(m.running);if(m.version)setVersion(m.version);}if(m.type==='stats')updateStats(m);if(m.type==='info')setVersion(m.version);if(m.type==='players')setPlayers(m.list);};
+  ws.onmessage=function(e){
+    var m;try{m=JSON.parse(e.data);}catch(x){return;}
+    if(m.type==='log')appendLog(m.data);
+    if(m.type==='status'){setStatus(m.running);if(m.version)setVersion(m.version);}
+    if(m.type==='stats')updateStats(m);
+    if(m.type==='info')setVersion(m.version);
+    if(m.type==='players')setPlayers(m.list);
+    if(m.type==='playerevent'&&pdCurrentName&&m.player&&String(m.player).toLowerCase()===pdCurrentName.toLowerCase())refreshPlayerDetailSilent();
+  };
   ws.onclose=function(){wsConnected=false;document.getElementById('wsWarn').classList.add('show');setTimeout(initWS,3000);};
   ws.onerror=function(){ws.close();};
 }
@@ -952,16 +1017,31 @@ async function sendCmd(){var input=document.getElementById('cmdinput'),val=input
 function fillCmd(prefix){var input=document.getElementById('cmdinput');input.value=prefix;input.focus();showPage('console');}
 function clearLog(){['log','mini-log'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML='';});logLineCount=0;errCount=0;warnCount=0;updateLogCounters();}
 function downloadLog(){var lines=Array.prototype.slice.call(document.getElementById('log').querySelectorAll('.log-text')).map(function(d){return d.textContent;}).join('\n');var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines],{type:'text/plain'}));a.download='mc-log-'+new Date().toISOString().slice(0,10)+'.txt';a.click();}
-function toggleAutoScroll(){autoScrollEnabled=!autoScrollEnabled;var btn=document.getElementById('autoscroll-btn');btn.style.color=autoScrollEnabled?'var(--accent)':'';btn.style.borderColor=autoScrollEnabled?'var(--accent)':'';var pref=document.getElementById('pref-autoscroll');if(pref)pref.checked=autoScrollEnabled;if(autoScrollEnabled)scrollToBottom();toast(autoScrollEnabled?'تمرير تلقائي مفعّل':'تمرير تلقائي معطّل');}
-function toggleLineNumbers(){showLineNumbers=!showLineNumbers;var btn=document.getElementById('linenum-btn');if(btn){btn.style.color=showLineNumbers?'var(--accent)':'';btn.style.borderColor=showLineNumbers?'var(--accent)':'';}var pref=document.getElementById('pref-linenum');if(pref)pref.checked=showLineNumbers;document.getElementById('log').querySelectorAll('.log-linenum').forEach(function(el){el.style.display=showLineNumbers?'':'none';});}
+
+// ════════════ التمرير التلقائي — إصلاح شامل ════════════
+// المصدر الوحيد للتغيير هو setAutoScroll(); لا شيء آخر (كمستمع التمرير) يعدّل
+// المتغيّر بصمت — وهذا بالضبط ما كان يسبب مشكلة "أول ضغطة تعطّل، ثانية تعطّل
+// مرة أخرى، ثالثة تفعّل": كان مستمع التمرير يعيد تفعيل الخاصية دون تحديث الزر.
+function setAutoScroll(enabled){
+  autoScrollEnabled=!!enabled;
+  var btn=document.getElementById('autoscroll-btn');
+  if(btn)btn.classList.toggle('active-toggle',autoScrollEnabled);
+  var pref=document.getElementById('pref-autoscroll');
+  if(pref)pref.checked=autoScrollEnabled;
+  if(autoScrollEnabled)scrollToBottom();
+}
+function toggleAutoScroll(){setAutoScroll(!autoScrollEnabled);toast(autoScrollEnabled?'تمرير تلقائي مفعّل':'تمرير تلقائي معطّل');}
 function scrollToBottom(){var area=document.getElementById('log');if(area)area.scrollTop=area.scrollHeight;}
+function jumpToBottom(){setAutoScroll(true);}
+
+function toggleLineNumbers(){showLineNumbers=!showLineNumbers;var btn=document.getElementById('linenum-btn');if(btn){btn.classList.toggle('active-toggle',showLineNumbers);}var pref=document.getElementById('pref-linenum');if(pref)pref.checked=showLineNumbers;document.getElementById('log').querySelectorAll('.log-linenum').forEach(function(el){el.style.display=showLineNumbers?'':'none';});}
 function filterLog(){searchQuery=document.getElementById('log-search').value.toLowerCase().trim();filterType=null;applyLogFilter();}
 function filterByType(type){filterType=filterType===type?null:type;searchQuery='';document.getElementById('log-search').value='';applyLogFilter();document.getElementById('err-count').style.opacity=(!filterType||filterType==='ERROR')?'1':'.5';document.getElementById('warn-count').style.opacity=(!filterType||filterType==='WARN')?'1':'.5';}
 function applyLogFilter(){document.getElementById('log').querySelectorAll('.log-line').forEach(function(line){var t=line.querySelector('.log-text');var text=t?t.textContent.toLowerCase():'';var show=true;if(searchQuery)show=text.indexOf(searchQuery)>-1;if(filterType==='ERROR')show=text.indexOf('error')>-1||text.indexOf('exception')>-1;if(filterType==='WARN')show=text.indexOf('warn')>-1;line.style.display=show?'':'none';if(searchQuery&&show)line.classList.add('hl');else line.classList.remove('hl');});}
 function clearSearch(){document.getElementById('log-search').value='';searchQuery='';filterType=null;document.getElementById('err-count').style.opacity='1';document.getElementById('warn-count').style.opacity='1';applyLogFilter();}
 function updateLogCounters(){document.getElementById('err-num').textContent=errCount;document.getElementById('warn-num').textContent=warnCount;}
 function appendLog(text){
-  var shouldScroll=autoScrollEnabled;var pas=document.getElementById('pref-autoscroll');if(pas&&pas.checked===false)shouldScroll=false;
+  var shouldScroll=autoScrollEnabled;
   var areas=[document.getElementById('log'),document.getElementById('mini-log')];
   text.split('\n').forEach(function(line){
     if(!line.trim())return;
@@ -983,7 +1063,7 @@ function renderPlayers(){
   var list=Array.from(players.entries()).filter(function(e){return !filter||e[0].toLowerCase().indexOf(filter)>-1||e[1].toLowerCase().indexOf(filter)>-1;});
   if(!list.length){grid.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">'+(players.size?'لا نتائج للبحث':'لا يوجد لاعبون متصلون')+'</div>';return;}
   grid.innerHTML='';
-  list.forEach(function(entry){var name=entry[0],display=entry[1],safeName=esc(name),safeDisplay=esc(display),card=document.createElement('div');card.className='player-card';card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name">'+safeDisplay+'</div><div class="player-status"><div class="player-online-dot"></div>متصل</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safeName+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safeName+'">طرد</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safeName+'">حظر</button></div></div>';grid.appendChild(card);});
+  list.forEach(function(entry){var name=entry[0],display=entry[1],safeName=esc(name),safeDisplay=esc(display),card=document.createElement('div');card.className='player-card';card.setAttribute('data-popen',name);card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name">'+safeDisplay+'</div><div class="player-status"><div class="player-online-dot"></div>متصل</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safeName+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safeName+'">طرد</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safeName+'">حظر</button></div></div>';grid.appendChild(card);});
 }
 async function pa(action){var p=document.getElementById('pname').value.trim();if(!p){toast('أدخل اسم اللاعب','err');return;}if(!PLAYER_RE.test(p)){toast('اسم غير صالح','err');return;}await qp(action,p);}
 async function qp(action,player){try{await apiPost('/api/player/'+action,{player:player});toast(action+': '+esc(player));}catch(e){toast(e.message,'err');}}
@@ -994,7 +1074,245 @@ function unbanAction(){var name=document.getElementById('ban-name').value.trim()
 async function unbanFromList(name){await qp('unban',name);setTimeout(loadBans,600);}
 async function loadOps(){var tb=document.getElementById('ops-body');tb.innerHTML='<tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/ops').then(function(r){return r.json();});document.getElementById('total-ops').textContent=d.ops.length||'0';if(!d.ops.length){tb.innerHTML='<tr class="empty"><td colspan="3">لا يوجد مشرفون</td></tr>';return;}tb.innerHTML='';d.ops.forEach(function(o){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(o.name||'—')+'</span></td><td><span class="badge badge-op">Level '+(o.level||4)+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(o.uuid||'—')+'</td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">فشل التحميل</td></tr>';}}
 async function loadBans(){var tb=document.getElementById('bans-body');tb.innerHTML='<tr class="empty"><td colspan="4">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/bans').then(function(r){return r.json();});document.getElementById('total-banned').textContent=d.bans.length||'0';if(!d.bans.length){tb.innerHTML='<tr class="empty"><td colspan="4">لا يوجد محظورون</td></tr>';return;}tb.innerHTML='';d.bans.forEach(function(b){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(b.name||'—')+'</span></td><td style="font-size:12px;color:var(--danger)">'+esc(b.reason||'—')+'</td><td style="font-size:11px;color:var(--muted)">'+esc(b.created||'—')+'</td><td><button class="act-btn act-ok" data-unban="'+esc(b.name||'')+'">فك الحظر</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="4">فشل التحميل</td></tr>';}}
-async function loadWhitelist(){var tb=document.getElementById('wl-body');tb.innerHTML='<tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/whitelist').then(function(r){return r.json();});document.getElementById('total-players').textContent=d.whitelist.length||'—';if(!d.whitelist.length){tb.innerHTML='<tr class="empty"><td colspan="3">القائمة البيضاء فارغة</td></tr>';return;}tb.innerHTML='';d.whitelist.forEach(function(w){var sn=esc(w.name||'—'),tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+sn+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(w.uuid||'—')+'</td><td><button class="act-btn act-danger" data-wlrm="'+sn+'">إزالة</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">فشل التحميل</td></tr>';}}
+async function loadWhitelist(){var tb=document.getElementById('wl-body');tb.innerHTML='<tr class="empty"><td colspan="3">جارٍ التحميل...</td></tr>';try{var d=await fetch('/api/whitelist').then(function(r){return r.json();});if(!d.whitelist.length){tb.innerHTML='<tr class="empty"><td colspan="3">القائمة البيضاء فارغة</td></tr>';return;}tb.innerHTML='';d.whitelist.forEach(function(w){var sn=esc(w.name||'—'),tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+sn+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(w.uuid||'—')+'</td><td><button class="act-btn act-danger" data-wlrm="'+sn+'">إزالة</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">فشل التحميل</td></tr>';}}
+
+// ════════════ كل اللاعبين (سجل دائم) ════════════
+async function loadAllPlayers(){
+  try{
+    var d=await fetch('/api/players/all').then(function(r){return r.json();});
+    allPlayersData=d.players||[];
+    var tp=document.getElementById('total-players');if(tp)tp.textContent=d.total!=null?d.total:'—';
+    renderAllPlayersTable();
+  }catch(e){}
+}
+function renderAllPlayersTable(){
+  var tb=document.getElementById('allplayers-body');if(!tb)return;
+  var qEl=document.getElementById('allplayers-filter');var q=(qEl?qEl.value:'').toLowerCase();
+  var list=allPlayersData.filter(function(p){return !q||p.name.toLowerCase().indexOf(q)>-1;});
+  if(!list.length){tb.innerHTML='<tr class="empty"><td colspan="5">لا يوجد لاعبون بعد</td></tr>';return;}
+  tb.innerHTML='';
+  list.forEach(function(p){
+    var tr=document.createElement('tr');tr.className='player-row';tr.setAttribute('data-popen',p.name);
+    tr.innerHTML='<td><span class="pname">'+esc(p.name)+'</span></td>'
+      +'<td>'+(p.online?'<span class="badge badge-on">متصل</span>':'<span class="badge badge-off">غير متصل</span>')+'</td>'
+      +'<td style="font-size:11px;color:var(--muted);">'+fmtDate(p.firstSeen)+'</td>'
+      +'<td style="font-size:11px;color:var(--muted);">'+fmtDate(p.lastSeen)+'</td>'
+      +'<td style="font-size:11px;">'+(p.joinCount||0)+'</td>';
+    tb.appendChild(tr);
+  });
+}
+
+// ════════════ نافذة تفاصيل اللاعب ════════════
+var CAUSE_LABELS={ENTITY_ATTACK:'هجوم مباشر',PROJECTILE:'إصابة بمقذوف',FALL:'سقوط',FIRE:'حريق',FIRE_TICK:'احتراق مستمر',LAVA:'حمم بركانية',DROWNING:'غرق',SUFFOCATION:'اختناق',STARVATION:'جوع',VOID:'السقوط خارج العالم',LIGHTNING:'صاعقة',MAGIC:'سحر/تأثير',POISON:'سُم',WITHER:'ذبول',EXPLOSION:'انفجار',CONTACT:'ملامسة (كاكتوس ونحوه)',CRAMMING:'ازدحام كائنات',FLY_INTO_WALL:'اصطدام أثناء الطيران',HOT_FLOOR:'ماغما',DRAGON_BREATH:'نفَس التنين',FREEZE:'تجمّد',SONIC_BOOM:'انفجار صوتي (واردن)',CUSTOM:'سبب مخصص',SUICIDE:'أمر kill',THORNS:'شوك درع',FALLING_BLOCK:'كتلة ساقطة',COMMAND:'أمر (tp)',ENDER_PEARL:'لؤلؤة إندر',CHORUS_FRUIT:'ثمرة كورس',NETHER_PORTAL:'بوابة نذر',END_PORTAL:'بوابة الإند',END_GATEWAY:'بوابة عودة الإند',SPECTATE:'مراقبة',PLUGIN:'إضافة',UNKNOWN:'غير معروف'};
+function prettifyCause(raw){if(!raw)return 'غير معروف';var parts=String(raw).split(':');var base=CAUSE_LABELS[parts[0]]||parts[0];if(parts[1]==='PLAYER'&&parts[2])return base+' — اللاعب '+esc(parts[2]);if(parts[1]==='MOB'&&parts[2])return base+' — '+esc(parts[2]);return base;}
+function itemCategoryEmoji(id){var s=id.toLowerCase();if(/sword|trident/.test(s))return '⚔️';if(/pickaxe|axe|shovel|hoe/.test(s))return '⛏️';if(/bow|crossbow|arrow/.test(s))return '🏹';if(/helmet|chestplate|leggings|boots|shield|elytra/.test(s))return '🛡️';if(/potion/.test(s))return '🧪';if(/apple|bread|beef|porkchop|chicken|mutton|rabbit|fish|salmon|cod|carrot|potato|stew|soup|cake|cookie|melon|berries|pie/.test(s))return '🍖';if(/diamond|emerald|netherite|gold_ingot|iron_ingot|lapis|amethyst|quartz/.test(s))return '💎';if(/log|planks|stem/.test(s))return '🪵';if(/ore|stone|cobblestone|deepslate|blackstone/.test(s))return '🪨';if(/spawn_egg/.test(s))return '🥚';if(/music_disc/.test(s))return '💿';if(/book/.test(s))return '📖';return '📦';}
+function itemDisplayName(id){return String(id).split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');}
+var ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+function toRoman(n){return ROMAN[n]||n;}
+var ENCHANT_LABELS={protection:'حماية',fire_protection:'حماية من النار',feather_falling:'سقوط بالريشة',blast_protection:'حماية من الانفجارات',projectile_protection:'حماية من المقذوفات',respiration:'التنفس',aqua_affinity:'تقارب الماء',thorns:'الأشواك',depth_strider:'عداء الأعماق',frost_walker:'السير على الجليد',binding_curse:'لعنة الالتصاق',sharpness:'الحدة',smite:'إبادة الموتى',bane_of_arthropods:'مبيد المفصليات',knockback:'الصد',fire_aspect:'اللهب',looting:'النهب',sweeping:'الحافة الكاسحة',sweeping_edge:'الحافة الكاسحة',efficiency:'الكفاءة',silk_touch:'اللمسة الحريرية',unbreaking:'عدم الكسر',fortune:'الحظ',power:'القوة',punch:'اللكم',flame:'اللهب',infinity:'اللانهاية',luck_of_the_sea:'حظ البحر',lure:'الإغراء',loyalty:'الولاء',impaling:'الاختراق',riptide:'المد',channeling:'التوجيه',multishot:'الطلقات المتعددة',piercing:'الاختراق',quick_charge:'الشحن السريع',soul_speed:'سرعة الروح',swift_sneak:'التسلل السريع',mending:'الإصلاح',vanishing_curse:'لعنة الزوال'};
+function enchantLabel(id){return ENCHANT_LABELS[id]||itemDisplayName(id);}
+var ITEM_TEXTURE_BASE='https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.1/assets/minecraft/textures';
+function itemIconHtml(id){
+  var itemUrl=ITEM_TEXTURE_BASE+'/item/'+id+'.png';
+  var blockUrl=ITEM_TEXTURE_BASE+'/block/'+id+'.png';
+  var emoji=itemCategoryEmoji(id);
+  return '<img src="'+itemUrl+'" alt="" onerror="if(this.dataset.stage!==\'block\'){this.dataset.stage=\'block\';this.src=\''+blockUrl+'\';}else{this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}">'
+    +'<span class="mc-emoji-fb">'+emoji+'</span>';
+}
+// يخزَّن هنا كل عنصر ظاهر في تبويب المخزون/الصندوق السحري الحالي، للرجوع إليه عند فتح تفاصيله بالنقر
+var _pdTooltipItems=[];
+function mcSlotHtml(it){
+  var idx=_pdTooltipItems.length;
+  _pdTooltipItems.push(it);
+  var duraHtml='';
+  if(it.durability&&it.durability.max){
+    var pct=Math.max(0,Math.min(100,it.durability.current/it.durability.max*100));
+    var color=pct>50?'#7fd13b':pct>20?'#e0a72e':'#c93f3f';
+    duraHtml='<div class="mc-dura-bar"><div class="mc-dura-fill" style="width:'+pct+'%;background:'+color+';"></div></div>';
+  }
+  return '<div class="mc-slot" data-invidx="'+idx+'">'+itemIconHtml(it.id)+duraHtml+(it.count>1?'<span class="mc-count">'+it.count+'</span>':'')+'</div>';
+}
+function mcEmptySlotHtml(){return '<div class="mc-slot mc-slot-empty"></div>';}
+function showItemTooltip(idx,el){
+  var it=_pdTooltipItems[idx];if(!it)return;
+  closeItemTooltip();
+  var hasEnch=it.enchantments&&it.enchantments.length>0;
+  var tip=document.createElement('div');
+  tip.id='mc-item-tooltip';
+  tip.className='mc-tooltip'+(hasEnch?' mc-tt-ench':'');
+  var html='<div class="mc-tt-name">'+esc(itemDisplayName(it.id))+'</div>';
+  if(hasEnch)html+=it.enchantments.map(function(e){return '<div class="mc-tt-ench-line">'+esc(enchantLabel(e.id))+' '+toRoman(e.level)+'</div>';}).join('');
+  if(it.durability&&it.durability.max)html+='<div class="mc-tt-dura">المتانة: '+it.durability.current+' / '+it.durability.max+'</div>';
+  html+='<div class="mc-tt-dura" style="direction:ltr;text-align:left;opacity:.6;">×'+it.count+'</div>';
+  tip.innerHTML=html;
+  document.body.appendChild(tip);
+  var r=el.getBoundingClientRect();
+  tip.style.position='fixed';
+  var top=r.bottom+6;
+  if(top+tip.offsetHeight>window.innerHeight-10)top=Math.max(8,r.top-tip.offsetHeight-6);
+  tip.style.top=top+'px';
+  var left=r.left+r.width/2-tip.offsetWidth/2;
+  left=Math.max(8,Math.min(left,window.innerWidth-tip.offsetWidth-8));
+  tip.style.left=left+'px';
+}
+function closeItemTooltip(){var t=document.getElementById('mc-item-tooltip');if(t)t.remove();}
+
+function openPlayerDetail(name){
+  pdCurrentName=name;
+  showPage('player-detail');
+  document.getElementById('pd-name').textContent=name;
+  document.getElementById('pd-status').textContent='جارٍ التحميل...';
+  document.getElementById('pd-avatar').src='https://mc-heads.net/avatar/'+encodeURIComponent(name)+'/80';
+  document.getElementById('pd-body').innerHTML='<div class="pd-empty">جارٍ التحميل...</div>';
+  fetch('/api/players/detail?name='+encodeURIComponent(name)).then(function(r){return r.json();}).then(function(d){
+    pdCurrent=d;
+    document.getElementById('pd-status').textContent=(d.online?'🟢 متصل الآن':'⚪ غير متصل — آخر ظهور '+fmtAgo(d.lastSeen))+' · انضم '+(d.joinCount||0)+' مرة';
+    showPdTab(pdActiveTab);
+    requestAnimationFrame(resetScrollTop);
+  }).catch(function(){document.getElementById('pd-body').innerHTML='<div class="pd-empty">فشل تحميل بيانات اللاعب</div>';});
+}
+function showPdTab(tab){
+  pdActiveTab=tab;
+  closeItemTooltip();
+  document.querySelectorAll('#page-player-detail .sub-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-pdt')===tab);});
+  if(!pdCurrent)return;
+  var fn={health:renderPdHealth,inventory:renderPdInventory,enderchest:renderPdEnderChest,info:renderPdInfo,stats:renderPdStats,deaths:renderPdDeaths,teleports:renderPdTeleports,delete:renderPdDelete}[tab];
+  if(fn)document.getElementById('pd-body').innerHTML=fn(pdCurrent);
+}
+function renderPdHealth(d){
+  var data=d.data||{};
+  if(!data.available)return '<div class="pd-empty">'+esc(data.reason||'غير متاح')+'<br><br>يُحاوَل أولاً استعلام حي إن كان اللاعب متصلاً، وإلا تُقرأ البيانات من آخر حفظ لملفه — جرّب "حفظ العالم الآن" من تبويب معلومات ثم أعد الفتح.</div>';
+  var hp=data.health!=null?data.health:0,hpPct=Math.max(0,Math.min(100,hp/20*100));
+  var food=data.food!=null?data.food:0,foodPct=Math.max(0,Math.min(100,food/20*100));
+  var gm=['بقاء (Survival)','إبداعي (Creative)','مغامرة (Adventure)','مراقب (Spectator)'][data.gameMode];
+  var controls=d.online?('<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;">'
+    +'<button class="btn btn-primary" onclick="playerQuickAction(\'heal\')">❤️ علاج</button>'
+    +'<button class="btn btn-primary" onclick="playerQuickAction(\'feed\')">🍗 تغذية</button>'
+    +'<button class="btn btn-danger" onclick="playerQuickAction(\'kill\')">💀 قتل</button>'
+    +'</div>'):('<div style="font-size:11px;color:var(--muted);margin-top:16px;">أزرار العلاج/التغذية/القتل تحتاج اللاعب متصلاً الآن.</div>');
+  return (data.live?'<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">🔴 بيانات حية من السيرفر الآن</div>':'')
+    +'<div class="pd-bar-row"><div class="pd-bar-label"><span>الصحة</span><span>'+(data.health!=null?hp.toFixed(1):'—')+' / 20.0</span></div><div class="progress-wrap"><div class="progress-bar" style="width:'+hpPct+'%;background:var(--danger)"></div></div></div>'
+    +'<div class="pd-bar-row"><div class="pd-bar-label"><span>الجوع</span><span>'+(data.food!=null?food:'—')+' / 20</span></div><div class="progress-wrap"><div class="progress-bar" style="width:'+foodPct+'%;background:var(--warn)"></div></div></div>'
+    +'<div class="info-row"><span class="info-key">مستوى الخبرة</span><span class="info-val">'+(data.xpLevel!=null?data.xpLevel:'—')+'</span></div>'
+    +'<div class="info-row"><span class="info-key">نمط اللعب</span><span class="info-val" style="direction:rtl;">'+(gm||'—')+'</span></div>'
+    +controls;
+}
+function playerQuickAction(action){
+  if(!pdCurrentName)return;
+  qp(action,pdCurrentName);
+  toast(action==='heal'?'تم إرسال أمر العلاج':action==='feed'?'تم إرسال أمر التغذية':'تم إرسال أمر القتل');
+  setTimeout(refreshPlayerDetailSilent,700);
+}
+function renderPdInventory(d){
+  var data=d.data||{};
+  if(!data.available)return '<div class="pd-empty">'+esc(data.reason||'غير متاح')+'<br><br>يُحاوَل أولاً استعلام حي إن كان اللاعب متصلاً، وإلا تُقرأ البيانات من آخر حفظ لملفه.</div>';
+  _pdTooltipItems=[];
+  var armor=data.armor||{},offhand=data.offhand;
+  var armorHtml='<div class="mc-armor-col">'
+    +(armor.helmet?mcSlotHtml(armor.helmet):mcEmptySlotHtml())
+    +(armor.chestplate?mcSlotHtml(armor.chestplate):mcEmptySlotHtml())
+    +(armor.leggings?mcSlotHtml(armor.leggings):mcEmptySlotHtml())
+    +(armor.boots?mcSlotHtml(armor.boots):mcEmptySlotHtml())
+    +(offhand?mcSlotHtml(offhand):mcEmptySlotHtml())
+    +'</div>';
+  var bySlot={};(data.inventory||[]).forEach(function(it){if(it.count>0)bySlot[it.slot]=it;});
+  var mainRows='';for(var s=9;s<=35;s++)mainRows+=bySlot[s]?mcSlotHtml(bySlot[s]):mcEmptySlotHtml();
+  var hotbarRow='';for(var h=0;h<=8;h++)hotbarRow+=bySlot[h]?mcSlotHtml(bySlot[h]):mcEmptySlotHtml();
+  var mainHtml='<div class="mc-slot-grid">'+mainRows+'</div><div class="mc-hotbar-sep"></div><div class="mc-slot-grid">'+hotbarRow+'</div>';
+  return '<div class="mc-frame"><div class="mc-inv-layout">'+armorHtml+'<div class="mc-main-slots">'+mainHtml+'</div></div></div>'
+    +'<div style="font-size:11px;color:var(--muted);">انقر على أي عنصر لعرض تفاصيله (السحر، المتانة).</div>';
+}
+function renderPdEnderChest(d){
+  var data=d.data||{};
+  if(!data.available)return '<div class="pd-empty">'+esc(data.reason||'غير متاح')+'</div>';
+  _pdTooltipItems=[];
+  var bySlot={};(data.enderChest||[]).forEach(function(it){if(it.count>0)bySlot[it.slot]=it;});
+  var rows='';for(var s=0;s<27;s++)rows+=bySlot[s]?mcSlotHtml(bySlot[s]):mcEmptySlotHtml();
+  return '<div class="mc-frame"><div class="mc-slot-grid">'+rows+'</div></div>'
+    +'<div style="font-size:11px;color:var(--muted);">انقر على أي عنصر لعرض تفاصيله.</div>';
+}
+function renderPdDelete(d){
+  var online=d.online;
+  var warn=online?'<div class="pd-empty" style="color:var(--warn);text-align:right;padding:0 0 16px;">⚠ اللاعب متصل الآن — يجب أن يغادر السيرفر أولاً قبل حذف بياناته.</div>':'';
+  var items=[['xp','نقاط الخبرة'],['inventory','المخزون (يشمل الدروع واليد الثانية)'],['enderChest','الصندوق السحري'],['stats','ملف الإحصائيات'],['advancements','ملف التقدم'],['panelHistory','سجل أماكن الموت والانتقال (اللوحة)']];
+  var checks=items.map(function(it){
+    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 0;cursor:pointer;border-bottom:1px solid var(--muted2);font-size:13px;"><input type="checkbox" class="pd-del-check" value="'+it[0]+'" style="width:16px;height:16px;flex-shrink:0;">'+it[1]+'</label>';
+  }).join('');
+  return warn
+    +'<label style="display:flex;align-items:center;gap:10px;padding:9px 0;margin-bottom:4px;border-bottom:2px solid var(--border);cursor:pointer;font-weight:700;font-size:13px;"><input type="checkbox" id="pd-del-all" onchange="document.querySelectorAll(\'.pd-del-check\').forEach(function(c){c.checked=document.getElementById(\'pd-del-all\').checked;})" style="width:16px;height:16px;flex-shrink:0;">تحديد الكل</label>'
+    +checks
+    +'<button class="btn btn-danger" style="margin-top:18px;"'+(online?' disabled':'')+' onclick="confirmDeletePlayerData()">🗑 حذف بيانات اللاعب المحدَّدة</button>';
+}
+function confirmDeletePlayerData(){
+  var checked=Array.prototype.slice.call(document.querySelectorAll('.pd-del-check:checked')).map(function(c){return c.value;});
+  if(!checked.length){toast('اختر عنصراً واحداً على الأقل','err');return;}
+  confirm2('حذف بيانات اللاعب','سيُحذف نهائياً: '+checked.join('، ')+'. لا يمكن التراجع عن هذا الإجراء.',async function(){
+    var parts={};checked.forEach(function(k){parts[k]=true;});
+    try{
+      await apiPost('/api/players/delete-data',{name:pdCurrentName,parts:parts});
+      toast('تم الحذف ✓');
+      refreshPlayerDetailSilent();
+    }catch(e){toast(e.message,'err');}
+  });
+}
+function renderPdInfo(d){
+  var data=d.data||{};
+  var dimMap={'minecraft:overworld':'العالم الرئيسي','minecraft:the_nether':'النذر (Nether)','minecraft:the_end':'الإند (End)'};
+  var posHtml;
+  if(data.available&&data.pos){
+    var cx=Math.round(data.pos.x),cy=Math.round(data.pos.y),cz=Math.round(data.pos.z);
+    var coordStr=cx+', '+cy+', '+cz;
+    posHtml='<div class="pd-loc-row"><div><div class="pd-loc-coords">'+coordStr+'</div><div class="pd-loc-meta">'+(dimMap[data.dimension]||esc(data.dimension||'—'))+'</div></div><button class="btn-sm" onclick="copyText(\''+cx+' '+cy+' '+cz+'\')">نسخ</button></div>';
+  }else{
+    posHtml='<div class="pd-empty">'+esc((data&&data.reason)||'الموقع غير متاح حالياً')+'</div>';
+  }
+  return '<div class="info-row"><span class="info-key">أول ظهور</span><span class="info-val">'+fmtDate(d.firstSeen)+'</span></div>'
+    +'<div class="info-row"><span class="info-key">آخر ظهور</span><span class="info-val">'+fmtDate(d.lastSeen)+'</span></div>'
+    +(d.lastLeft?'<div class="info-row"><span class="info-key">آخر مغادرة</span><span class="info-val">'+fmtDate(d.lastLeft)+'</span></div>':'')
+    +'<div class="info-row"><span class="info-key">مرات الدخول</span><span class="info-val">'+(d.joinCount||0)+'</span></div>'
+    +'<div class="info-row"><span class="info-key">UUID</span><span class="info-val" style="font-size:10px;">'+esc(d.uuid||'—')+'</span></div>'
+    +'<div style="margin:14px 0 8px;font-size:11px;color:var(--text2);font-weight:700;">آخر موقع محفوظ</div>'
+    +posHtml
+    +'<button class="btn btn-ghost" style="margin-top:10px;" onclick="saveWorldAndRefreshPd()">💾 حفظ العالم الآن وتحديث</button>'
+    +(d.debug&&d.debug.uuidGuessed?'<div class="pd-empty" style="margin-top:12px;color:var(--warn);text-align:right;">⚠ لم يُعثر على UUID مسجّل لهذا اللاعب في usercache.json ولا ops.json ولا whitelist.json ولا banned-players.json. القيمة المستخدمة أدناه مُقدَّرة حسابياً (تصح فقط لو كان السيرفر online-mode=false)، وقد لا تطابق ملفات اللاعب الفعلية إن كان يعمل بوضع online-mode أو Bedrock عبر Floodgate.</div>':'')
+    +(d.debug?('<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);line-height:2;direction:ltr;text-align:left;">'
+      +'world: '+esc(d.debug.worldName)+'<br>'
+      +'stats: '+esc(d.debug.statsPath)+'<br>'
+      +'playerdata: '+esc(d.debug.playerDataPath)+'</div>'):'');
+}
+function saveWorldAndRefreshPd(){cmd('save-all');toast('جارٍ حفظ العالم...');setTimeout(refreshPlayerDetailSilent,2500);}
+function renderPdStats(d){
+  var s=d.stats;
+  if(!s)return '<div class="pd-empty">لا توجد إحصائيات محفوظة لهذا اللاعب بعد</div>';
+  var kd=s.deaths>0?(s.playerKills/s.deaths).toFixed(2):Number(s.playerKills||0).toFixed(2);
+  var boxes=[[s.deaths||0,'الوفيات'],[s.playerKills||0,'قتل لاعبين'],[s.mobKills||0,'قتل مخلوقات'],[fmtPlaytime(s.playTimeTicks),'وقت اللعب'],[kd,'معدل القتل/الوفاة'],[fmtDist(s.distances.walk),'مسافة المشي']];
+  var html='<div class="pd-stat-grid">'+boxes.map(function(b){return '<div class="pd-stat-box"><div class="pd-stat-num">'+b[0]+'</div><div class="pd-stat-lbl">'+b[1]+'</div></div>';}).join('')+'</div>';
+  var distRows=[['sprint','الركض'],['swim','السباحة'],['fall','السقوط'],['climb','التسلق'],['boat','القارب'],['elytra','الإيلترا'],['horse','الحصان']];
+  var distHtml=distRows.map(function(r){var v=s.distances[r[0]];if(!v)return '';return '<div class="pd-mined-row"><span>'+r[1]+'</span><span class="info-val">'+fmtDist(v)+'</span></div>';}).join('');
+  if(distHtml)html+='<div style="margin-bottom:16px;">'+distHtml+'</div>';
+  if(s.topMined&&s.topMined.length){
+    html+='<div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:8px;">أكثر الكتل تعديناً</div>';
+    html+=s.topMined.map(function(m){return '<div class="pd-mined-row"><span>'+esc(itemDisplayName(m.block))+'</span><span class="info-val">'+m.count+'</span></div>';}).join('');
+  }
+  return html;
+}
+function renderPdDeaths(d){
+  var deaths=d.deaths||[];
+  if(!deaths.length)return '<div class="pd-empty">لا توجد سجلات وفاة بعد.<br><br>تحتاج هذه الميزة تركيب إضافة PanelDataLogger المرفقة مع اللوحة على السيرفر.</div>';
+  return deaths.map(function(e){
+    var cx=Math.round(e.x),cy=Math.round(e.y),cz=Math.round(e.z),coordStr=cx+', '+cy+', '+cz;
+    return '<div class="pd-loc-row"><div><div class="pd-loc-coords">'+coordStr+' — '+esc(e.world||'')+'</div><div class="pd-loc-meta">'+prettifyCause(e.cause)+' · '+fmtAgo(e.t)+'</div></div><button class="btn-sm" onclick="copyText(\''+cx+' '+cy+' '+cz+'\')">نسخ</button></div>';
+  }).join('');
+}
+function renderPdTeleports(d){
+  var tps=d.teleports||[];
+  if(!tps.length)return '<div class="pd-empty">لا توجد سجلات انتقال بعد.<br><br>تحتاج هذه الميزة تركيب إضافة PanelDataLogger المرفقة مع اللوحة على السيرفر.</div>';
+  return tps.map(function(e){
+    var fx=Math.round(e.from.x),fy=Math.round(e.from.y),fz=Math.round(e.from.z);
+    var tx=Math.round(e.to.x),ty=Math.round(e.to.y),tz=Math.round(e.to.z);
+    return '<div class="pd-loc-row"><div><div class="pd-loc-coords">'+esc(e.from.world)+' ('+fx+','+fy+','+fz+') ← '+esc(e.to.world)+' ('+tx+','+ty+','+tz+')</div><div class="pd-loc-meta">'+prettifyCause(e.cause)+' · '+fmtAgo(e.t)+'</div></div><button class="btn-sm" onclick="copyText(\''+tx+' '+ty+' '+tz+'\')">نسخ الوجهة</button></div>';
+  }).join('');
+}
 
 // ════════════ FILE MANAGER ════════════
 var allFileItems=[];
@@ -1020,11 +1338,34 @@ function renderFileTable(files,relPath){
     var size=f.type==='dir'?'—':fmtBytes(f.size);
     var icon=f.type==='dir'?'📁':getFileIcon(f.name);
     var tr=document.createElement('tr');
-    tr.setAttribute('data-slot',slot);
-    var openBtn=f.type==='dir'?'<button class="act-btn act-ok" data-fa="open">فتح</button>':'<button class="act-btn act-ok" data-fa="edit">تعديل</button>';
-    var dlBtn=f.type==='dir'?'':'<button class="act-btn act-info" data-fa="download">⬇ تنزيل</button>';
-    tr.innerHTML='<td><span class="file-icon">'+icon+'</span><span class="fname">'+safe+'</span></td><td><span class="fsize">'+size+'</span></td><td><span style="font-size:11px;color:var(--muted)">'+(f.type==='dir'?'مجلد':'ملف')+'</span></td><td><div class="act-btns">'+openBtn+dlBtn+'<button class="act-btn act-danger" data-fa="del">حذف</button></div></td>';
+    tr.className='file-row';
+    tr.setAttribute('data-frow',slot);
+    tr.innerHTML='<td><span class="file-icon">'+icon+'</span><span class="fname">'+safe+'</span></td><td><span class="fsize">'+size+'</span></td><td><span style="font-size:11px;color:var(--muted)">'+(f.type==='dir'?'مجلد':'ملف')+'</span></td><td style="text-align:left;"><button class="kebab-btn" data-fkebab="'+slot+'">⋮</button></td>';
     tb.appendChild(tr);
+  });
+}
+function closeFileMenu(){var m=document.getElementById('file-ctx-menu');if(m)m.remove();openMenuSlot=null;}
+function openFileMenu(slot,btnEl){
+  var already=(openMenuSlot===slot);
+  closeFileMenu();
+  if(already)return;
+  var item=_files[slot];if(!item)return;
+  openMenuSlot=slot;
+  var menu=document.createElement('div');menu.id='file-ctx-menu';menu.className='file-menu';
+  var actions=item.type==='dir'?[['rename','✏️ إعادة تسمية'],['delete','🗑 حذف']]:[['edit','📝 تعديل'],['download','⬇ تنزيل'],['rename','✏️ إعادة تسمية'],['delete','🗑 حذف']];
+  menu.innerHTML=actions.map(function(a){return '<div class="file-menu-item'+(a[0]==='delete'?' danger':'')+'" data-fmenu="'+a[0]+'" data-fslot="'+slot+'">'+a[1]+'</div>';}).join('');
+  document.body.appendChild(menu);
+  var r=btnEl.getBoundingClientRect();
+  menu.style.position='fixed';
+  menu.style.top=(r.bottom+4)+'px';
+  var left=r.right-menu.offsetWidth;if(left<8)left=8;
+  menu.style.left=left+'px';
+}
+function renameFile(slot){
+  var item=_files[slot];if(!item)return;
+  promptModal('إعادة تسمية "'+item.name+'"',item.name,async function(newName){
+    if(newName===item.name)return;
+    try{await apiPost('/api/files/rename',{path:item.fPath,newName:newName});toast('تم تغيير الاسم ✓');loadFiles(currentFilePath);}catch(e){toast(e.message,'err');}
   });
 }
 function getFileIcon(name){var ext=name.split('.').pop().toLowerCase(),map={yml:'📄',yaml:'📄',json:'📋',properties:'⚙️',log:'📝',txt:'📝',sh:'⚡',js:'📜',html:'🌐',css:'🎨',zip:'📦',jar:'☕',toml:'📄',conf:'⚙️',md:'📝'};return map[ext]||'📄';}
@@ -1055,16 +1396,182 @@ function deleteBackup(name){confirm2('حذف النسخة','هل تريد حذف
 function setAutoBackup(){var mins=parseInt(document.getElementById('auto-backup-interval').value)||60;if(mins<5){toast('الحد الأدنى 5 دقائق','err');return;}clearInterval(autoBackupInterval);autoBackupInterval=setInterval(function(){if(running){cmd('save-all');setTimeout(function(){createBackup();},3000);}},mins*60000);document.getElementById('auto-backup-status').textContent='مفعّل — كل '+mins+' دقيقة';document.getElementById('auto-backup-status').style.color='var(--accent)';toast('نسخ تلقائي كل '+mins+' دقيقة');}
 function clearAutoBackup(){clearInterval(autoBackupInterval);autoBackupInterval=null;document.getElementById('auto-backup-status').textContent='غير مفعّل';document.getElementById('auto-backup-status').style.color='';toast('تم الإيقاف','warn');}
 
-// ════════════ SETTINGS ════════════
-async function loadProps(){try{var r=await fetch('/api/settings/properties');if(!r.ok)return;var p=(await r.json()).props;var si=function(id,v){var e=document.getElementById(id);if(e&&v!==undefined)e.value=v;};var sc=function(id,v){var e=document.getElementById(id);if(e)e.checked=v==='true';};si('prop-motd',p['motd']);si('prop-maxplayers',p['max-players']);si('prop-port',p['server-port']);si('prop-difficulty',p['difficulty']);si('prop-gamemode',p['gamemode']);si('prop-viewdist',p['view-distance']);si('prop-simdist',p['simulation-distance']);si('prop-idletimeout',p['player-idle-timeout']);sc('prop-pvp',p['pvp']);sc('prop-whitelist',p['white-list']);sc('prop-cmdblocks',p['enable-command-block']);sc('prop-online',p['online-mode']);sc('prop-nether',p['allow-nether']);sc('prop-hardcore',p['hardcore']);}catch(e){}}
-async function applyProps(){var gv=function(id){var e=document.getElementById(id);return e?e.value:'';};var gc=function(id){var e=document.getElementById(id);return e&&e.checked?'true':'false';};var props={'motd':gv('prop-motd'),'max-players':gv('prop-maxplayers'),'server-port':gv('prop-port'),'difficulty':gv('prop-difficulty'),'gamemode':gv('prop-gamemode'),'pvp':gc('prop-pvp'),'white-list':gc('prop-whitelist'),'enable-command-block':gc('prop-cmdblocks'),'online-mode':gc('prop-online'),'allow-nether':gc('prop-nether'),'hardcore':gc('prop-hardcore'),'view-distance':gv('prop-viewdist'),'simulation-distance':gv('prop-simdist'),'player-idle-timeout':gv('prop-idletimeout')};try{await apiPost('/api/settings/properties',{props:props});toast('تم حفظ الإعدادات ✓');}catch(e){toast(e.message,'err');}}
+// ════════════ SETTINGS: server.properties (مبنية من مخطط PROP_SCHEMA) ════════════
+var PROP_SCHEMA=[
+ {cat:'عام',key:'motd',label:'MOTD (رسالة السيرفر)',type:'text',def:'A Minecraft Server'},
+ {cat:'عام',key:'max-players',label:'الحد الأقصى للاعبين',type:'number',def:'20'},
+ {cat:'عام',key:'server-port',label:'منفذ Java',type:'number',ltr:true,def:'25565'},
+ {cat:'عام',key:'server-ip',label:'عنوان IP للربط (فارغ = الكل)',type:'text',ltr:true,def:''},
+ {cat:'عام',key:'level-name',label:'اسم مجلد العالم',type:'text',ltr:true,def:'world'},
+ {cat:'عام',key:'level-seed',label:'بذرة العالم (Seed)',type:'text',ltr:true,def:''},
+ {cat:'عام',key:'level-type',label:'نوع توليد العالم',type:'select',opts:['minecraft:normal','minecraft:flat','minecraft:large_biomes','minecraft:amplified','minecraft:single_biome_surface'],def:'minecraft:normal'},
+ {cat:'عام',key:'difficulty',label:'الصعوبة',type:'select',opts:['peaceful','easy','normal','hard'],def:'normal'},
+ {cat:'عام',key:'gamemode',label:'نمط اللعبة الافتراضي',type:'select',opts:['survival','creative','adventure','spectator'],def:'survival'},
+ {cat:'عام',key:'force-gamemode',label:'فرض نمط اللعبة عند الدخول',type:'toggle',def:'false'},
+ {cat:'اللعب',key:'pvp',label:'PvP',type:'toggle',def:'true',desc:'السماح بالقتال بين اللاعبين'},
+ {cat:'اللعب',key:'hardcore',label:'Hardcore',type:'toggle',def:'false',desc:'الموت النهائي'},
+ {cat:'اللعب',key:'white-list',label:'Whitelist',type:'toggle',def:'false',desc:'تقييد الدخول بقائمة محددة'},
+ {cat:'اللعب',key:'enforce-whitelist',label:'فرض Whitelist فوراً',type:'toggle',def:'false',desc:'طرد أي لاعب غير مدرَج فور تعديل القائمة'},
+ {cat:'اللعب',key:'allow-nether',label:'تفعيل Nether',type:'toggle',def:'true'},
+ {cat:'اللعب',key:'allow-flight',label:'السماح بالطيران',type:'toggle',def:'false',desc:'بدون إيلترا أو نمط إبداعي'},
+ {cat:'اللعب',key:'spawn-monsters',label:'ظهور المخلوقات المعادية',type:'toggle',def:'true'},
+ {cat:'اللعب',key:'spawn-animals',label:'ظهور الحيوانات',type:'toggle',def:'true'},
+ {cat:'اللعب',key:'spawn-npcs',label:'ظهور القرويين',type:'toggle',def:'true'},
+ {cat:'اللعب',key:'generate-structures',label:'توليد التراكيب',type:'toggle',def:'true',desc:'قرى، معابد، حصون...'},
+ {cat:'اللعب',key:'enable-command-block',label:'Command Blocks',type:'toggle',def:'false'},
+ {cat:'اللعب',key:'function-permission-level',label:'مستوى صلاحية الدوال',type:'number',def:'2'},
+ {cat:'اللعب',key:'op-permission-level',label:'مستوى صلاحية المشرفين',type:'number',def:'4'},
+ {cat:'اللعب',key:'spawn-protection',label:'حماية نقطة الظهور (كتل)',type:'number',def:'16'},
+ {cat:'اللعب',key:'max-world-size',label:'أقصى حجم للعالم',type:'number',def:'29999984'},
+ {cat:'الأداء',key:'view-distance',label:'View Distance (chunks)',type:'number',def:'10'},
+ {cat:'الأداء',key:'simulation-distance',label:'Simulation Distance (chunks)',type:'number',def:'10'},
+ {cat:'الأداء',key:'entity-broadcast-range-percentage',label:'نطاق بث الكائنات (%)',type:'number',def:'100'},
+ {cat:'الأداء',key:'network-compression-threshold',label:'حد ضغط الشبكة (بايت)',type:'number',def:'256'},
+ {cat:'الأداء',key:'max-tick-time',label:'أقصى وقت Tick (ملي ثانية)',type:'number',def:'60000'},
+ {cat:'الأداء',key:'player-idle-timeout',label:'طرد الخامل بعد (دقائق، 0=معطّل)',type:'number',def:'0'},
+ {cat:'الأداء',key:'sync-chunk-writes',label:'كتابة الـ Chunks بشكل متزامن',type:'toggle',def:'true'},
+ {cat:'الأداء',key:'use-native-transport',label:'النقل الأصلي (Linux)',type:'toggle',def:'true'},
+ {cat:'الشبكة والأمان',key:'online-mode',label:'Online Mode',type:'toggle',def:'true',desc:'التحقق من حسابات Mojang الأصلية'},
+ {cat:'الشبكة والأمان',key:'prevent-proxy-connections',label:'منع الاتصال عبر بروكسي/VPN',type:'toggle',def:'false'},
+ {cat:'الشبكة والأمان',key:'enforce-secure-profile',label:'فرض الملف الشخصي الموثّق',type:'toggle',def:'true'},
+ {cat:'الشبكة والأمان',key:'hide-online-players',label:'إخفاء عدد اللاعبين من الـ Ping',type:'toggle',def:'false'},
+ {cat:'الشبكة والأمان',key:'log-ips',label:'تسجيل عناوين IP في اللوق',type:'toggle',def:'true'},
+ {cat:'الشبكة والأمان',key:'broadcast-console-to-ops',label:'بث أوامر الكونسول للمشرفين',type:'toggle',def:'true'},
+ {cat:'الشبكة والأمان',key:'broadcast-rcon-to-ops',label:'بث أوامر RCON للمشرفين',type:'toggle',def:'false'},
+ {cat:'RCON و Query',key:'enable-rcon',label:'تفعيل RCON',type:'toggle',def:'false'},
+ {cat:'RCON و Query',key:'rcon.port',label:'منفذ RCON',type:'number',ltr:true,def:'25575'},
+ {cat:'RCON و Query',key:'rcon.password',label:'كلمة مرور RCON',type:'text',ltr:true,def:''},
+ {cat:'RCON و Query',key:'enable-query',label:'تفعيل Query',type:'toggle',def:'false'},
+ {cat:'RCON و Query',key:'query.port',label:'منفذ Query',type:'number',ltr:true,def:'25565'},
+ {cat:'حزمة الموارد',key:'resource-pack',label:'رابط حزمة الموارد',type:'text',ltr:true,def:''},
+ {cat:'حزمة الموارد',key:'resource-pack-sha1',label:'SHA1 لحزمة الموارد',type:'text',ltr:true,def:''},
+ {cat:'حزمة الموارد',key:'resource-pack-prompt',label:'رسالة طلب حزمة الموارد',type:'text',def:''},
+ {cat:'حزمة الموارد',key:'require-resource-pack',label:'إجبار قبول حزمة الموارد',type:'toggle',def:'false'}
+];
+function propId(key){return 'prop-'+key.replace(/[.]/g,'_');}
+function buildPropsUI(){
+  var container=document.getElementById('props-container');
+  var cats=[];PROP_SCHEMA.forEach(function(f){if(cats.indexOf(f.cat)===-1)cats.push(f.cat);});
+  var html='';
+  cats.forEach(function(cat){
+    var fields=PROP_SCHEMA.filter(function(f){return f.cat===cat;});
+    var simple=fields.filter(function(f){return f.type!=='toggle';});
+    var toggles=fields.filter(function(f){return f.type==='toggle';});
+    html+='<div class="settings-group"><div class="settings-group-title">'+esc(cat)+'</div>';
+    if(simple.length){
+      html+='<div class="grid2">'+simple.map(function(f){
+        var id=propId(f.key);
+        if(f.type==='select')return '<div class="field"><label class="lbl">'+esc(f.label)+'</label><select class="sel" id="'+id+'">'+f.opts.map(function(o){return '<option value="'+o+'">'+o+'</option>';}).join('')+'</select></div>';
+        return '<div class="field"><label class="lbl">'+esc(f.label)+'</label><input class="inp" id="'+id+'" type="'+(f.type==='number'?'number':'text')+'"'+(f.ltr?' style="direction:ltr;"':'')+'></div>';
+      }).join('')+'</div>';
+    }
+    toggles.forEach(function(f){
+      var id=propId(f.key);
+      html+='<div class="setting-row"><div class="setting-info"><div class="setting-name">'+esc(f.label)+'</div>'+(f.desc?'<div class="setting-desc">'+esc(f.desc)+'</div>':'')+'</div><div class="setting-control"><label class="toggle"><input type="checkbox" id="'+id+'"><span class="toggle-slider"></span></label></div></div>';
+    });
+    html+='</div>';
+  });
+  html+='<div class="settings-group"><div class="settings-group-title">خصائص إضافية (غير مغطاة أعلاه)</div><div id="adv-props-list"></div><button class="btn btn-ghost" style="margin-top:6px;" onclick="addAdvPropRow(\'\',\'\',true)">+ إضافة خاصية</button></div>';
+  container.innerHTML=html;
+}
+function addAdvPropRow(key,val,isNew){
+  var list=document.getElementById('adv-props-list');if(!list)return;
+  var row=document.createElement('div');row.className='advprop-row';
+  if(isNew){
+    row.innerHTML='<input class="inp adv-key-input" placeholder="اسم الخاصية" value="'+esc(key||'')+'"><input class="inp adv-val" placeholder="القيمة" value="'+esc(val||'')+'"><button class="btn-sm" onclick="this.parentElement.remove()">🗑</button>';
+  }else{
+    row.innerHTML='<div class="adv-key-label" title="'+esc(key)+'">'+esc(key)+'</div><input class="inp adv-val" value="'+esc(val||'')+'"><button class="btn-sm" onclick="this.parentElement.remove()">🗑</button>';
+  }
+  list.appendChild(row);
+}
+async function loadProps(){
+  buildPropsUI();
+  try{
+    var r=await fetch('/api/settings/properties');if(!r.ok)return;
+    var props=(await r.json()).props||{};
+    var known={};
+    PROP_SCHEMA.forEach(function(f){
+      known[f.key]=true;
+      var el=document.getElementById(propId(f.key));if(!el)return;
+      var v=props[f.key]!==undefined?props[f.key]:f.def;
+      if(f.type==='toggle')el.checked=(v==='true');else el.value=v;
+    });
+    var advKeys=Object.keys(props).filter(function(k){return !known[k];});
+    var advList=document.getElementById('adv-props-list');if(advList)advList.innerHTML='';
+    advKeys.forEach(function(k){addAdvPropRow(k,props[k],false);});
+  }catch(e){}
+}
+async function applyProps(){
+  var props={};
+  PROP_SCHEMA.forEach(function(f){
+    var el=document.getElementById(propId(f.key));if(!el)return;
+    props[f.key]=f.type==='toggle'?(el.checked?'true':'false'):String(el.value);
+  });
+  document.querySelectorAll('#adv-props-list .advprop-row').forEach(function(row){
+    var keyEl=row.querySelector('.adv-key-input');
+    var k;
+    if(keyEl){k=keyEl.value.trim();}
+    else{var labelEl=row.querySelector('.adv-key-label');k=labelEl?labelEl.getAttribute('title'):null;}
+    var v=row.querySelector('.adv-val').value;
+    if(k)props[k]=v;
+  });
+  try{await apiPost('/api/settings/properties',{props:props});toast('تم حفظ جميع الإعدادات ✓');}catch(e){toast(e.message,'err');}
+}
+
+// ════════════ SETTINGS: JVM (Xmx ديناميكي حسب الرام الفعلي) ════════════
+function buildXmxOptions(totalRamGB,currentXmx){
+  var sel=document.getElementById('jvm-xmx');if(!sel)return;
+  var max=(totalRamGB&&totalRamGB>=2)?(totalRamGB-(totalRamGB%2)):8;
+  var opts=[];for(var g=2;g<=max;g+=2)opts.push(g+'G');
+  if(!opts.length)opts.push('2G');
+  var currentVal=currentXmx||'2G';
+  if(opts.indexOf(currentVal)===-1)opts.push(currentVal);
+  sel.innerHTML=opts.map(function(o){return '<option value="'+o+'"'+(o===currentVal?' selected':'')+'>'+o+'</option>';}).join('');
+  var hint=document.getElementById('jvm-xmx-hint');
+  if(hint)hint.textContent=totalRamGB?('الرام المكتشف على الجهاز: '+totalRamGB+' GB'):'';
+}
 async function applyStartup(){var cfg={xms:document.getElementById('jvm-xms').value,xmx:document.getElementById('jvm-xmx').value,g1gc:document.getElementById('jvm-g1gc').checked,extraFlags:document.getElementById('jvm-extra').value};try{await apiPost('/api/settings/startup',cfg);toast('تم حفظ إعدادات JVM ✓');}catch(e){toast(e.message,'err');}}
-async function loadStartupSettings(){try{var d=await fetch('/api/settings/startup').then(function(r){return r.json();});var si=function(id,v){var e=document.getElementById(id);if(e)e.value=v;};si('jvm-xms',d.xms);si('jvm-xmx',d.xmx);document.getElementById('jvm-g1gc').checked=!!d.g1gc;si('jvm-extra',d.extraFlags||'');}catch(e){}}
-function applyPanelSettings(){var e=document.getElementById('pref-maxlog');MAX_LOG_NODES=parseInt(e?e.value:'800')||800;var pa=document.getElementById('pref-autoscroll');if(pa)autoScrollEnabled=pa.checked;var pl=document.getElementById('pref-linenum');if(pl)showLineNumbers=pl.checked;toast('تم حفظ الإعدادات ✓');}
+async function loadStartupSettings(){try{var d=await fetch('/api/settings/startup').then(function(r){return r.json();});var si=function(id,v){var e=document.getElementById(id);if(e)e.value=v;};si('jvm-xms',d.xms);buildXmxOptions(d.totalRamGB,d.xmx);document.getElementById('jvm-g1gc').checked=!!d.g1gc;si('jvm-extra',d.extraFlags||'');}catch(e){}}
+function applyPanelSettings(){var e=document.getElementById('pref-maxlog');MAX_LOG_NODES=parseInt(e?e.value:'800')||800;var pa=document.getElementById('pref-autoscroll');if(pa)setAutoScroll(pa.checked);var pl=document.getElementById('pref-linenum');if(pl){showLineNumbers=pl.checked;var b=document.getElementById('linenum-btn');if(b)b.classList.toggle('active-toggle',showLineNumbers);}toast('تم حفظ الإعدادات ✓');}
 function toggleAutoList(){var on=document.getElementById('pref-autolist').checked;if(on&&running&&!listInterval)listInterval=setInterval(function(){if(running&&wsConnected)cmd('list');},30000);else if(!on){clearInterval(listInterval);listInterval=null;}}
 
 // ════════════ NAV ════════════
-function showPage(name){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});document.getElementById('page-'+name).classList.add('active');var order=['overview','console','players','files','backups','settings'],idx=order.indexOf(name),tabs=Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));if(tabs[idx])tabs[idx].classList.add('active');if(name==='files')loadFiles(currentFilePath);if(name==='backups')loadBackups();if(name==='settings'){loadProps();loadStartupSettings();}if(name==='console'){setTimeout(function(){var a=document.getElementById('log');if(a&&autoScrollEnabled)a.scrollTop=a.scrollHeight;},50);}}
+function resetScrollTop(){window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;}
+// يخفي الصفحة الحالية تماماً (تصبح غير موجودة في التخطيط إطلاقاً) ويصفّر التمرير
+// بينما لا توجد أي صفحة ظاهرة على الإطلاق، ثم يُظهر الصفحة الجديدة بعد ذلك فقط —
+// هذا يمنع اللحظة التي تتداخل فيها الصفحة القديمة الطويلة مع الجديدة القصيرة،
+// وهي سبب "تفتح الصفحة من الأسفل" (خصوصاً مع التمرير بالقصور الذاتي على الجوال)
+function showPage(name){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.documentElement.style.overflow='hidden'; // يقتل أي تمرير بالقصور الذاتي ما زال يعمل
+  resetScrollTop();
+  requestAnimationFrame(function(){
+    resetScrollTop();
+    document.documentElement.style.overflow='';
+    var target=document.getElementById('page-'+name);if(target)target.classList.add('active');
+    var order=['overview','console','players','files','backups','settings'],idx=order.indexOf(name);
+    if(idx>-1){document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});var tabs=Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));if(tabs[idx])tabs[idx].classList.add('active');}
+    if(name!=='player-detail'){pdCurrentName=null;pdCurrent=null;}
+    if(name==='files')loadFiles(currentFilePath);
+    if(name==='backups')loadBackups();
+    if(name==='players')loadAllPlayers();
+    if(name==='settings'){loadProps();loadStartupSettings();}
+    if(name==='console'){setTimeout(function(){var a=document.getElementById('log');if(a&&autoScrollEnabled)a.scrollTop=a.scrollHeight;},50);}
+    requestAnimationFrame(resetScrollTop);
+  });
+}
+// تحديث صامت لمحتوى صفحة تفاصيل اللاعب فقط إن كانت هي الصفحة المعروضة فعلاً حالياً —
+// لا يفتح الصفحة ولا ينقل المستخدم إليها إطلاقاً، بخلاف openPlayerDetail
+function refreshPlayerDetailSilent(){
+  if(!pdCurrentName)return;
+  var page=document.getElementById('page-player-detail');
+  if(!page||!page.classList.contains('active'))return;
+  fetch('/api/players/detail?name='+encodeURIComponent(pdCurrentName)).then(function(r){return r.json();}).then(function(d){
+    pdCurrent=d;
+    document.getElementById('pd-status').textContent=(d.online?'🟢 متصل الآن':'⚪ غير متصل — آخر ظهور '+fmtAgo(d.lastSeen))+' · انضم '+(d.joinCount||0)+' مرة';
+    showPdTab(pdActiveTab);
+  }).catch(function(){});
+}
 function showSubTab(page,name){var c=document.getElementById('page-'+page);if(!c)return;c.querySelectorAll('.sub-tab').forEach(function(t){t.classList.remove('active');});c.querySelectorAll('.sub-page').forEach(function(p){p.classList.remove('active');});var st=c.querySelector('.sub-tab[data-sub="'+name+'"]');if(st)st.classList.add('active');var sp=document.getElementById(page+'-'+name);if(sp)sp.classList.add('active');}
 
 // ════════════ TOAST + MODAL ════════════
@@ -1072,35 +1579,75 @@ var toastTimer=null;
 function toast(msg,type){type=type||'';var t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.className='toast';},2800);}
 function confirm2(title,body,cb){document.getElementById('modal-title').textContent=title;document.getElementById('modal-body').textContent=body;modalCallback=cb;document.getElementById('confirm-modal').classList.add('show');}
 function closeModal(){document.getElementById('confirm-modal').classList.remove('show');modalCallback=null;}
+function promptModal(title,defVal,cb){
+  document.getElementById('prompt-title').textContent=title;
+  var inp=document.getElementById('prompt-input');inp.value=defVal||'';inp.style.direction='ltr';
+  promptCallback=cb;
+  document.getElementById('prompt-modal').classList.add('show');
+  setTimeout(function(){inp.focus();inp.select();},60);
+}
+function closePromptModal(){document.getElementById('prompt-modal').classList.remove('show');promptCallback=null;}
 
-// ════════════ EVENT DELEGATION (the reliable way) ════════════
+// ════════════ EVENT DELEGATION (المكان الموثوق للتعامل مع العناصر الديناميكية) ════════════
 document.addEventListener('click',function(e){
-  // Modal confirm
+  // نافذة الإدخال (إعادة التسمية وغيرها)
+  if(e.target.id==='prompt-confirm'){var pcb=promptCallback;var val=document.getElementById('prompt-input').value.trim();closePromptModal();if(pcb&&val)pcb(val);return;}
+  if(e.target.id==='prompt-modal'){closePromptModal();return;}
+  // نافذة التأكيد
   if(e.target.id==='modal-confirm'){var cb=modalCallback;closeModal();if(cb)cb();return;}
-  // Modal overlay click to close
   if(e.target.id==='confirm-modal'){closeModal();return;}
-  // File actions
-  var fb=e.target.closest('[data-fa]');
-  if(fb){var tr=fb.closest('tr[data-slot]');if(tr){var slot=parseInt(tr.getAttribute('data-slot'));var item=_files[slot];if(item){var act=fb.getAttribute('data-fa');if(act==='open')loadFiles(item.fPath);else if(act==='edit')openFile(item.fPath,item.name);else if(act==='del')deleteFile(item.fPath,item.name);else if(act==='download')downloadFile(item.fPath,item.name);}}return;}
-  // Player actions
+
+  // تفاصيل عنصر داخل المخزون/الصندوق السحري (نقرة تفتح، نقرة أخرى على نفس العنصر تغلق)
+  var slotEl=e.target.closest('[data-invidx]');
+  if(slotEl){
+    var already=document.getElementById('mc-item-tooltip')&&slotEl.getAttribute('data-invidx')===String(_lastTooltipIdx);
+    if(already){closeItemTooltip();_lastTooltipIdx=null;}
+    else{showItemTooltip(parseInt(slotEl.getAttribute('data-invidx')),slotEl);_lastTooltipIdx=slotEl.getAttribute('data-invidx');}
+    return;
+  }
+  if(!e.target.closest('.mc-tooltip'))closeItemTooltip();
+
+  // عناصر قائمة الملف المنسدلة (⋮) — يجب فحصها قبل زر ⋮ نفسه وقبل فتح الصف
+  var fmi=e.target.closest('[data-fmenu]');
+  if(fmi){
+    var act=fmi.getAttribute('data-fmenu'),slot=parseInt(fmi.getAttribute('data-fslot')),item=_files[slot];
+    closeFileMenu();
+    if(item){if(act==='edit')openFile(item.fPath,item.name);else if(act==='download')downloadFile(item.fPath,item.name);else if(act==='rename')renameFile(slot);else if(act==='delete')deleteFile(item.fPath,item.name);}
+    return;
+  }
+  // زر ⋮ نفسه
+  var kb=e.target.closest('[data-fkebab]');
+  if(kb){openFileMenu(parseInt(kb.getAttribute('data-fkebab')),kb);return;}
+  // أي نقر آخر يُغلق القائمة المنسدلة المفتوحة إن وُجدت
+  if(openMenuSlot!==null&&!e.target.closest('.file-menu'))closeFileMenu();
+
+  // إجراءات اللاعب المتصل (OP/طرد/حظر)
   var pb=e.target.closest('[data-pa][data-pn]');
   if(pb){qp(pb.getAttribute('data-pa'),pb.getAttribute('data-pn'));return;}
-  // Unban
+  // فك الحظر
   var ub=e.target.closest('[data-unban]');
   if(ub){unbanFromList(ub.getAttribute('data-unban'));return;}
-  // Whitelist remove
+  // إزالة من Whitelist
   var wb=e.target.closest('[data-wlrm]');
   if(wb){var n=wb.getAttribute('data-wlrm');cmd('whitelist remove '+n);toast('إزالة: '+n,'warn');setTimeout(loadWhitelist,600);return;}
-  // Backup restore/delete
+  // نسخة احتياطية: استعادة/حذف
   var br=e.target.closest('[data-bkr]');if(br){restoreBackup(br.getAttribute('data-bkr'));return;}
   var bd=e.target.closest('[data-bkd]');if(bd){deleteBackup(bd.getAttribute('data-bkd'));return;}
+
+  // فتح صف ملف/مجلد (كامل حدود الصف قابل للنقر)
+  var frow=e.target.closest('tr[data-frow]');
+  if(frow){var fs=parseInt(frow.getAttribute('data-frow')),fi=_files[fs];if(fi){if(fi.type==='dir')loadFiles(fi.fPath);else openFile(fi.fPath,fi.name);}return;}
+
+  // فتح تفاصيل لاعب (بطاقة متصل أو صف في "كل اللاعبين")
+  var popen=e.target.closest('[data-popen]');
+  if(popen){openPlayerDetail(popen.getAttribute('data-popen'));return;}
 });
 
 // Keyboard
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();if(e.ctrlKey&&e.key==='l'){e.preventDefault();clearLog();}if(e.ctrlKey&&e.key==='/'){e.preventDefault();showPage('console');setTimeout(function(){var i=document.getElementById('cmdinput');if(i)i.focus();},50);}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();closePromptModal();closeFileMenu();}if(e.ctrlKey&&e.key==='l'){e.preventDefault();clearLog();}if(e.ctrlKey&&e.key==='/'){e.preventDefault();showPage('console');setTimeout(function(){var i=document.getElementById('cmdinput');if(i)i.focus();},50);}});
 
-// Scroll tracking
-window.addEventListener('load',function(){var area=document.getElementById('log');if(area)area.addEventListener('scroll',function(){var btn=document.getElementById('scroll-btn');if(!btn)return;var atBottom=area.scrollHeight-area.scrollTop-area.clientHeight<100;btn.classList.toggle('show',!atBottom&&area.scrollHeight>area.clientHeight+100);if(atBottom)autoScrollEnabled=true;});});
+// تتبّع التمرير — فقط للتحكم بظهور زر "اذهب للأسفل"، لا يغيّر حالة التمرير التلقائي إطلاقاً
+window.addEventListener('load',function(){var area=document.getElementById('log');if(area)area.addEventListener('scroll',function(){var btn=document.getElementById('scroll-btn');if(!btn)return;var atBottom=area.scrollHeight-area.scrollTop-area.clientHeight<100;btn.classList.toggle('show',!atBottom&&area.scrollHeight>area.clientHeight+100);});});
 
 // ════════════ THEME ════════════
 function toggleTheme(){
@@ -1120,3 +1667,4 @@ function toggleTheme(){
 })();
 </script>
 </body>
+</html>
