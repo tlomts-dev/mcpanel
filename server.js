@@ -1,5 +1,5 @@
 /**
- * MC Panel - server.js (v4 - Auto-Restart Edition)
+ * MC Panel - server.js (v5 - Player Intelligence Edition)
  */
 
 require('dotenv').config();
@@ -17,6 +17,16 @@ const crypto     = require('crypto');
 const archiver   = require('archiver');
 const unzipper   = require('unzipper');
 const os         = require('os');
+const zlib       = require('zlib');
+
+// مكتبة قراءة NBT (لملفات playerdata) — اختيارية، لا تُسقط اللوحة إذا لم تُثبَّت
+let nbt = null;
+try { nbt = require('prismarine-nbt'); }
+catch { console.warn('[Panel] prismarine-nbt غير مثبّتة — قراءة ملفات NBT المحفوظة ستكون معطّلة حتى تشغيل npm install'); }
+
+// منفذ خادم HTTP المدمج داخل إضافة PanelDataLogger — يُستخدم للاستعلام المباشر
+// عن بيانات اللاعبين المتصلين (أدق وأسرع بكثير من قراءة كونسول أو ملف محفوظ)
+const PANEL_HTTP_PORT = parseInt(process.env.PANEL_HTTP_PORT || '28281', 10);
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PORT        = parseInt(process.env.PORT || '8080', 10);
@@ -24,6 +34,7 @@ const SERVER_DIR  = path.resolve(process.env.MC_DIR || '/opt/minecraft');
 const SERVER_JAR  = process.env.MC_JAR || 'spigot-1.21.11.jar';
 const BACKUPS_DIR = path.join(SERVER_DIR, 'backups');
 const STARTUP_CFG = path.join(SERVER_DIR, '.panel-startup.json');
+const PLAYERS_DB_FILE = path.join(SERVER_DIR, '.panel-players.json');
 const SESSION_SEC = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
 // ── tmux config ───────────────────────────────────────────
@@ -123,6 +134,325 @@ function broadcast(data) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  قاعدة بيانات اللاعبين الدائمة (.panel-players.json)
+//  تحل مشكلة "إجمالي اللاعبين = Whitelist فقط" وتضيف سجل كل من دخل السيرفر تاريخياً
+// ══════════════════════════════════════════════════════════════════════════════
+let playersDB   = {};
+let playersDirty = false;
+
+function loadPlayersDB() {
+  try { playersDB = JSON.parse(fs.readFileSync(PLAYERS_DB_FILE, 'utf8')); }
+  catch { playersDB = {}; }
+}
+function savePlayersDBNow() {
+  try { fs.writeFileSync(PLAYERS_DB_FILE, JSON.stringify(playersDB), 'utf8'); playersDirty = false; }
+  catch (e) { console.error('[Panel] فشل حفظ قاعدة بيانات اللاعبين:', e.message); }
+}
+setInterval(() => { if (playersDirty) savePlayersDBNow(); }, 5000);
+
+function getPlayerRecord(name) {
+  const key = name.toLowerCase();
+  if (!playersDB[key]) {
+    playersDB[key] = {
+      name, uuid: null,
+      firstSeen: Date.now(), lastSeen: Date.now(), lastLeft: null,
+      joinCount: 0, online: false,
+      deaths: [], teleports: [],
+    };
+  }
+  playersDB[key].name = name; // نحدّث آخر تهجئة/حالة أحرف معروفة للاسم
+  return playersDB[key];
+}
+
+function markJoin(name) {
+  const p = getPlayerRecord(name);
+  if (!p.online) p.joinCount = (p.joinCount || 0) + 1;
+  p.online = true;
+  p.lastSeen = Date.now();
+  playersDirty = true;
+}
+function markLeave(name) {
+  const key = name.toLowerCase();
+  if (!playersDB[key]) return;
+  playersDB[key].online = false;
+  playersDB[key].lastLeft = Date.now();
+  playersDirty = true;
+}
+// مزامنة كاملة من نتيجة أمر list: أي لاعب لم يعد ضمن القائمة الحالية يُعتبر خارج السيرفر
+function syncOnlineFromList(names) {
+  const nowOnline = new Set(names.map(n => n.toLowerCase()));
+  for (const key of Object.keys(playersDB)) {
+    if (playersDB[key].online && !nowOnline.has(key)) {
+      playersDB[key].online = false;
+      playersDB[key].lastLeft = Date.now();
+      playersDirty = true;
+    }
+  }
+  names.forEach(n => markJoin(n));
+}
+const MAX_EVENTS_PER_PLAYER = 60;
+function addDeath(name, entry) {
+  const p = getPlayerRecord(name);
+  p.deaths.push(entry);
+  if (p.deaths.length > MAX_EVENTS_PER_PLAYER) p.deaths.shift();
+  playersDirty = true;
+  broadcast({ type: 'playerevent', kind: 'death', player: name, entry });
+}
+function addTeleport(name, entry) {
+  const p = getPlayerRecord(name);
+  p.teleports.push(entry);
+  if (p.teleports.length > MAX_EVENTS_PER_PLAYER) p.teleports.shift();
+  playersDirty = true;
+  broadcast({ type: 'playerevent', kind: 'teleport', player: name, entry });
+}
+loadPlayersDB();
+
+// ── UUID: قراءة usercache.json + خوارزمية UUID الخاصة بالوضع غير المتصل (Offline) ──
+function offlineUuidFor(name) {
+  const md5 = crypto.createHash('md5').update('OfflinePlayer:' + name, 'utf8').digest();
+  md5[6] = (md5[6] & 0x0f) | 0x30; // النسخة 3
+  md5[8] = (md5[8] & 0x3f) | 0x80; // المتغيّر
+  const h = md5.toString('hex');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+async function resolveUuid(name) {
+  const rec = getPlayerRecord(name);
+  if (rec.uuid) return { uuid: rec.uuid, guessed: false };
+  // 1) usercache.json — يعمل بغض النظر عن online-mode
+  try {
+    const p = path.join(SERVER_DIR, 'usercache.json');
+    if (fs.existsSync(p)) {
+      const cache = JSON.parse(await fsp.readFile(p, 'utf8'));
+      const hit = cache.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
+      if (hit?.uuid) { rec.uuid = hit.uuid; playersDirty = true; return { uuid: hit.uuid, guessed: false }; }
+    }
+  } catch {}
+  // 2) ops.json / whitelist.json / banned-players.json كمصدر احتياطي
+  for (const file of ['ops.json', 'whitelist.json', 'banned-players.json']) {
+    try {
+      const p = path.join(SERVER_DIR, file);
+      if (!fs.existsSync(p)) continue;
+      const list = JSON.parse(await fsp.readFile(p, 'utf8'));
+      const hit = list.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
+      if (hit?.uuid) { rec.uuid = hit.uuid; playersDirty = true; return { uuid: hit.uuid, guessed: false }; }
+    } catch {}
+  }
+  // 3) احتياطي أخير: UUID المحسوب لوضع offline — يصح فقط إن كان السيرفر online-mode=false فعلياً
+  // لا يُحفَظ في rec.uuid عمداً، حتى تُعاد المحاولة من مصدر حقيقي في كل استدعاء لاحق
+  const off = offlineUuidFor(name);
+  return { uuid: off, guessed: true };
+}
+
+function getWorldName() {
+  try {
+    const txt = fs.readFileSync(PROPS_FILE, 'utf8');
+    const m = txt.match(/^level-name=(.*)$/m);
+    if (m && m[1].trim()) return m[1].trim();
+  } catch {}
+  return 'world';
+}
+
+// قراءة إحصائيات اللاعب (JSON عادي، لا يحتاج مكتبة NBT) — world/stats/<uuid>.json
+async function readPlayerStats(uuid) {
+  try {
+    const p = path.join(SERVER_DIR, getWorldName(), 'stats', `${uuid}.json`);
+    if (!fs.existsSync(p)) return null;
+    const j = JSON.parse(await fsp.readFile(p, 'utf8'));
+    const custom = j.stats?.['minecraft:custom'] || {};
+    const mined  = j.stats?.['minecraft:mined']  || {};
+    const cm = k => (custom[`minecraft:${k}`] || 0) / 100; // سم → متر
+    const topMined = Object.entries(mined)
+      .map(([k, v]) => ({ block: k.replace('minecraft:', ''), count: v }))
+      .sort((a, b) => b.count - a.count).slice(0, 8);
+    return {
+      deaths:      custom['minecraft:deaths'] ?? 0,
+      playerKills: custom['minecraft:player_kills'] ?? 0,
+      mobKills:    custom['minecraft:mob_kills'] ?? 0,
+      playTimeTicks: custom['minecraft:play_time'] ?? custom['minecraft:play_one_minute'] ?? 0,
+      distances: {
+        walk: cm('walk_one_cm'), sprint: cm('sprint_one_cm'), swim: cm('swim_one_cm'),
+        fall: cm('fall_one_cm'), climb: cm('climb_one_cm'), boat: cm('boat_one_cm'),
+        elytra: cm('aviate_one_cm'), horse: cm('horse_one_cm'),
+      },
+      topMined,
+    };
+  } catch { return null; }
+}
+
+// إحصائيات حية جاءت من خادم HTTP المدمج بالإضافة (بلا "أكثر الكتل تعديناً" — غير متاحة حياً بكفاءة)
+function normalizeLiveStats(s) {
+  if (!s) return null;
+  return {
+    deaths: s.deaths ?? 0, playerKills: s.playerKills ?? 0, mobKills: s.mobKills ?? 0,
+    playTimeTicks: s.playTimeTicks ?? 0,
+    distances: s.distances || {},
+    topMined: [],
+  };
+}
+
+const ARMOR_SLOT_NAME = { 100: 'boots', 101: 'leggings', 102: 'chestplate', 103: 'helmet' };
+
+// متانة قصوى لكل عنصر — NBT لا يخزّن الحد الأقصى إطلاقاً، فقط الضرر الحالي
+const MAX_DURABILITY = {
+  wooden_sword:59, wooden_pickaxe:59, wooden_axe:59, wooden_shovel:59, wooden_hoe:59,
+  stone_sword:131, stone_pickaxe:131, stone_axe:131, stone_shovel:131, stone_hoe:131,
+  iron_sword:250, iron_pickaxe:250, iron_axe:250, iron_shovel:250, iron_hoe:250,
+  golden_sword:32, golden_pickaxe:32, golden_axe:32, golden_shovel:32, golden_hoe:32,
+  diamond_sword:1561, diamond_pickaxe:1561, diamond_axe:1561, diamond_shovel:1561, diamond_hoe:1561,
+  netherite_sword:2031, netherite_pickaxe:2031, netherite_axe:2031, netherite_shovel:2031, netherite_hoe:2031,
+  bow:384, crossbow:465, trident:250, shield:336, fishing_rod:64, flint_and_steel:64,
+  shears:238, carrot_on_a_stick:25, warped_fungus_on_a_stick:100, elytra:432, brush:64,
+  leather_helmet:55, leather_chestplate:80, leather_leggings:75, leather_boots:65,
+  golden_helmet:77, golden_chestplate:112, golden_leggings:105, golden_boots:91,
+  chainmail_helmet:165, chainmail_chestplate:240, chainmail_leggings:225, chainmail_boots:195,
+  iron_helmet:165, iron_chestplate:240, iron_leggings:225, iron_boots:195,
+  diamond_helmet:363, diamond_chestplate:528, diamond_leggings:495, diamond_boots:429,
+  netherite_helmet:407, netherite_chestplate:592, netherite_leggings:555, netherite_boots:481,
+  turtle_helmet:275,
+};
+
+// يستخرج قائمة السحر (اسم + مستوى) من مركّب NBT الحديث أو الصيغة القديمة، دفاعياً
+function extractEnchantmentsNbt(it) {
+  const list = [];
+  const comp = it.components?.['minecraft:enchantments'] || it.components?.['minecraft:stored_enchantments'];
+  if (comp) {
+    const levels = comp.levels || comp;
+    if (levels && typeof levels === 'object') {
+      Object.entries(levels).forEach(([k, v]) => { if (typeof v === 'number') list.push({ id: k.replace('minecraft:', ''), level: v }); });
+    }
+  }
+  const legacy = it.tag?.Enchantments || it.tag?.ench;
+  if (Array.isArray(legacy)) {
+    legacy.forEach(e => {
+      const id = e?.id != null ? String(e.id).replace('minecraft:', '') : null;
+      const lvl = e?.lvl ?? e?.Level;
+      if (id != null && lvl != null) list.push({ id, level: lvl });
+    });
+  }
+  return list;
+}
+
+// يبني نتيجة موحّدة (مخزون/دروع/يد ثانية/صندوق سحري/موقع/صحة...) من كائن NBT مبسَّط لملف .dat المحفوظ
+function buildPlayerDataResult(d, live) {
+  const pos = Array.isArray(d.Pos) ? d.Pos : null;
+  const mkItem = it => {
+    const id = String(it.id || '').replace('minecraft:', '');
+    const enchantments = extractEnchantmentsNbt(it);
+    const result = {
+      id, count: it.count ?? it.Count ?? 1,
+      enchanted: enchantments.length > 0,
+      enchantments,
+    };
+    const maxDur = MAX_DURABILITY[id];
+    if (maxDur) {
+      const dmg = it.components?.['minecraft:damage'] ?? it.tag?.Damage ?? 0;
+      result.durability = { current: Math.max(0, maxDur - dmg), max: maxDur };
+    }
+    return result;
+  };
+
+  const main = [];
+  const armor = { helmet: null, chestplate: null, leggings: null, boots: null };
+  let offhand = null;
+  (Array.isArray(d.Inventory) ? d.Inventory : []).forEach(it => {
+    if (!it || !it.id) return;
+    const slot = it.Slot ?? it.slot;
+    if (slot === -106) { offhand = mkItem(it); return; }
+    if (ARMOR_SLOT_NAME[slot]) { armor[ARMOR_SLOT_NAME[slot]] = mkItem(it); return; }
+    if (slot >= 0 && slot <= 35) main.push({ slot, ...mkItem(it) });
+  });
+  const enderChest = (Array.isArray(d.EnderItems) ? d.EnderItems : [])
+    .filter(it => it && it.id)
+    .map(it => ({ slot: it.Slot ?? it.slot ?? 0, ...mkItem(it) }));
+
+  return {
+    available: true,
+    live: !!live,
+    dimension: d.Dimension || d.World || null,
+    pos: pos ? { x: pos[0], y: pos[1], z: pos[2] } : null,
+    health: d.Health ?? null,
+    maxHealth: 20,
+    food: d.foodLevel ?? d.FoodLevel ?? null,
+    xpLevel: d.XpLevel ?? null,
+    xpTotal: d.XpTotal ?? null,
+    gameMode: d.playerGameType ?? d.PlayerGameType ?? null,
+    inventory: main,
+    armor,
+    offhand,
+    enderChest,
+  };
+}
+
+// يطبّع رد خادم HTTP المدمج في إضافة PanelDataLogger إلى نفس شكل buildPlayerDataResult
+// حتى لا يحتاج أي كود آخر (بما فيه الواجهة) لمعرفة مصدر البيانات
+function normalizeHttpPlayerData(j) {
+  if (!j || j.online === false) return null;
+  const gmMap  = { SURVIVAL: 0, CREATIVE: 1, ADVENTURE: 2, SPECTATOR: 3 };
+  const dimMap = { NORMAL: 'minecraft:overworld', NETHER: 'minecraft:the_nether', THE_END: 'minecraft:the_end' };
+  const mkItem = it => it ? {
+    id: String(it.id || ''), count: it.count ?? 1,
+    enchanted: !!it.enchanted,
+    enchantments: Array.isArray(it.enchantments) ? it.enchantments : [],
+    durability: it.durability || null,
+  } : null;
+  return {
+    available: true,
+    live: true,
+    dimension: dimMap[j.dimension] || j.world || null,
+    pos: j.pos || null,
+    health: j.health ?? null,
+    maxHealth: j.maxHealth ?? 20,
+    food: j.food ?? null,
+    xpLevel: j.xpLevel ?? null,
+    xpTotal: j.xpTotal ?? null,
+    gameMode: gmMap[j.gameMode] ?? null,
+    inventory: Array.isArray(j.inventory) ? j.inventory.map(it => ({
+      slot: it.slot ?? 0, id: String(it.id || ''), count: it.count ?? 1, enchanted: !!it.enchanted,
+      enchantments: Array.isArray(it.enchantments) ? it.enchantments : [], durability: it.durability || null,
+    })) : [],
+    armor: {
+      helmet: mkItem(j.armor?.helmet), chestplate: mkItem(j.armor?.chestplate),
+      leggings: mkItem(j.armor?.leggings), boots: mkItem(j.armor?.boots),
+    },
+    offhand: mkItem(j.offhand),
+    enderChest: Array.isArray(j.enderChest) ? j.enderChest.map(it => ({
+      slot: it.slot ?? 0, id: String(it.id || ''), count: it.count ?? 1, enchanted: !!it.enchanted,
+      enchantments: Array.isArray(it.enchantments) ? it.enchantments : [], durability: it.durability || null,
+    })) : [],
+  };
+}
+
+// استعلام مباشر عن خادم HTTP المدمج داخل إضافة PanelDataLogger على نفس الجهاز (localhost فقط)
+// — لا يحتاج تحليل كونسول ولا انتظار حفظ ملف، ويقرأ بيانات اللاعب مباشرة من كائنه الحي في الذاكرة
+async function queryPluginHttp(name) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`http://127.0.0.1:${PANEL_HTTP_PORT}/player/${encodeURIComponent(name)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null; // الإضافة غير مركَّبة، أو خادمها غير مشغَّل، أو لا يوجد اتصال — ننتقل للاحتياطي بصمت
+  }
+}
+
+// قراءة بيانات اللاعب من ملف NBT المحفوظ على القرص (يعمل للمتصلين وغير المتصلين، لكن بتأخر حسب آخر حفظ)
+async function readPlayerDataFromFile(uuid) {
+  if (!nbt) return { available: false, reason: 'مكتبة prismarine-nbt غير مثبّتة على السيرفر (npm install)' };
+  try {
+    const p = path.join(SERVER_DIR, getWorldName(), 'playerdata', `${uuid}.dat`);
+    if (!fs.existsSync(p)) return { available: false, reason: 'لا يوجد ملف بيانات في المسار: ' + p };
+    const buf = await fsp.readFile(p);
+    const { parsed } = await nbt.parse(buf);
+    const d = nbt.simplify(parsed);
+    return buildPlayerDataResult(d, false);
+  } catch (e) {
+    return { available: false, reason: 'تعذّرت قراءة/تحليل ملف NBT: ' + e.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  إدارة tmux
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -175,6 +505,16 @@ function sendCommand(cmd) {
 const ANSI_RE = /\x1b\[[0-9;]*[mGKHF]|\x1b\][^\x07]*\x07|\x1b[()][AB0-9]/g;
 function stripAnsi(str) { return str.replace(ANSI_RE, ''); }
 
+// يستخرج اسم اللاعب الحقيقي من مقطع نص واحد ضمن رد أمر list
+// الأولوية: أي اسم داخل <> (تنسيق يستخدمه بعض إضافات الفرق/الرتب لعزل الاسم الحقيقي)
+// وإلا: آخر كلمة في النص (سلوك احتياطي متوافق مع الإصدارات السابقة)
+function extractPlayerName(segment) {
+  const bracket = segment.match(/<([a-zA-Z0-9_.]{1,16})>/);
+  if (bracket) return bracket[1];
+  const parts = segment.trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
 function parseLogLine(line) {
   const vm = line.match(/Starting minecraft server version (.+)/i);
   if (vm) { serverVersion = vm[1].trim(); broadcast({ type: 'info', version: serverVersion }); }
@@ -189,13 +529,48 @@ function parseLogLine(line) {
   const listMatch = line.match(/players online:\s*(.*)/i);
   if (listMatch) {
     const players = listMatch[1].split(',').map(s => {
-      const display = s.trim();
-      const parts = display.split(/\s+/).filter(Boolean);
-      const name = parts.length ? parts[parts.length - 1] : '';
-      return { name, display };
-    }).filter(p => p.name);
+      const name = extractPlayerName(s);
+      return { name, display: name };
+    }).filter(p => p.name && PLAYER_RE.test(p.name));
+    syncOnlineFromList(players.map(p => p.name));
     broadcast({ type: 'players', list: players });
     return true; // رد أمر list الداخلي، يبقى مخفي عن الكونسول
+  }
+
+  // انضمام/مغادرة — نسجّلها في قاعدة بيانات اللاعبين الدائمة (لا تُخفى من الكونسول)
+  const joinMatch = line.match(/]: (\S{1,16}) joined the game/i) || line.match(/]: (\S{1,16})\[.*?logged in/i);
+  if (joinMatch && PLAYER_RE.test(joinMatch[1])) markJoin(joinMatch[1]);
+  const leftMatch = line.match(/]: (\S{1,16}) left the game/i);
+  if (leftMatch && PLAYER_RE.test(leftMatch[1])) markLeave(leftMatch[1]);
+
+  // بيانات من إضافة PanelDataLogger المرافقة (اختيارية) — الوفيات والانتقالات بإحداثيات دقيقة
+  // شكل السطر المتوقع: [PanelData] DEATH|player|world|x|y|z|cause
+  //                     [PanelData] TELEPORT|player|cause|fromWorld|fx|fy|fz|toWorld|tx|ty|tz
+  const pd = line.match(/\[PanelData\]\s*(DEATH|TELEPORT)\|([^\r\n]*)/);
+  if (pd) {
+    const parts = pd[2].split('|');
+    try {
+      if (pd[1] === 'DEATH') {
+        const [player, world, x, y, z, ...causeParts] = parts;
+        if (player && PLAYER_RE.test(player)) {
+          addDeath(player, {
+            t: Date.now(), world,
+            x: parseFloat(x), y: parseFloat(y), z: parseFloat(z),
+            cause: causeParts.join('|') || 'غير معروف',
+          });
+        }
+      } else {
+        const [player, cause, fromWorld, fx, fy, fz, toWorld, tx, ty, tz] = parts;
+        if (player && PLAYER_RE.test(player)) {
+          addTeleport(player, {
+            t: Date.now(), cause: cause || 'UNKNOWN',
+            from: { world: fromWorld, x: parseFloat(fx), y: parseFloat(fy), z: parseFloat(fz) },
+            to:   { world: toWorld,   x: parseFloat(tx), y: parseFloat(ty), z: parseFloat(tz) },
+          });
+        }
+      }
+    } catch (e) { console.error('[Panel] فشل تحليل سطر PanelData:', e.message); }
+    return true; // مخفي عن الكونسول، مثل tps/list تماماً
   }
 
   return false;
@@ -441,6 +816,9 @@ const PLAYER_ACTIONS = {
   ban:   p => `ban ${p}`,
   kick:  p => `kick ${p}`,
   unban: p => `pardon ${p}`,
+  heal:  p => `data merge entity ${p} {Health:20.0f}`,
+  feed:  p => `data merge entity ${p} {foodLevel:20,foodSaturationLevel:20.0f}`,
+  kill:  p => `kill ${p}`,
 };
 Object.entries(PLAYER_ACTIONS).forEach(([action, fn]) => {
   app.post(`/api/player/${action}`, requireAuth, (req, res) => {
@@ -474,6 +852,120 @@ app.get('/api/whitelist', requireAuth, async (_req, res) => {
   res.json({ whitelist: list.map(w => ({ name: w.name || w, uuid: w.uuid })) });
 });
 
+// ── قاعدة بيانات اللاعبين (كل من دخل السيرفر تاريخياً) ────────────────────────
+app.get('/api/players/all', requireAuth, (_req, res) => {
+  const list = Object.values(playersDB).map(p => ({
+    name: p.name, online: !!p.online,
+    firstSeen: p.firstSeen, lastSeen: p.lastSeen, lastLeft: p.lastLeft,
+    joinCount: p.joinCount || 0,
+    deathCount: (p.deaths || []).length, teleportCount: (p.teleports || []).length,
+  })).sort((a, b) => (b.online - a.online) || (b.lastSeen - a.lastSeen));
+  res.json({ players: list, total: list.length });
+});
+
+app.get('/api/players/detail', requireAuth, async (req, res) => {
+  const name = sanitizePlayer(req.query.name);
+  if (!name) return res.status(400).json({ error: 'اسم لاعب غير صالح' });
+  const rec = getPlayerRecord(name);
+  const { uuid, guessed } = await resolveUuid(name);
+  const worldName = getWorldName();
+
+  // نستعلم عن الإضافة مرة واحدة فقط (بيانات + إحصائيات معاً) لتفادي طلبين منفصلين
+  const liveJson = rec.online ? await queryPluginHttp(rec.name) : null;
+
+  let data = normalizeHttpPlayerData(liveJson);
+  if (!data) data = await readPlayerDataFromFile(uuid);
+
+  let stats = (liveJson && liveJson.online) ? normalizeLiveStats(liveJson.stats) : null;
+  if (!stats) stats = await readPlayerStats(uuid);
+
+  res.json({
+    name: rec.name, online: !!rec.online,
+    firstSeen: rec.firstSeen, lastSeen: rec.lastSeen, lastLeft: rec.lastLeft,
+    joinCount: rec.joinCount || 0, uuid,
+    deaths: (rec.deaths || []).slice().reverse(),
+    teleports: (rec.teleports || []).slice().reverse(),
+    stats, data,
+    // للتشخيص فقط — يساعد على معرفة سبب "لا توجد بيانات" مباشرة من الواجهة
+    debug: {
+      worldName, uuidGuessed: guessed,
+      statsPath: path.join(SERVER_DIR, worldName, 'stats', `${uuid}.json`),
+      playerDataPath: path.join(SERVER_DIR, worldName, 'playerdata', `${uuid}.dat`),
+    },
+  });
+});
+
+// ── حذف بيانات لاعب (مخزون/صندوق سحري/خبرة عبر إعادة كتابة ملف NBT، إحصائيات/تقدم كملفات، وسجل اللوحة) ──
+app.post('/api/players/delete-data', requireAuth, async (req, res) => {
+  const name = sanitizePlayer(req.body.name);
+  if (!name) return res.status(400).json({ error: 'اسم لاعب غير صالح' });
+  const parts = req.body.parts || {};
+  const rec = getPlayerRecord(name);
+  if (rec.online) return res.status(409).json({ error: 'لا يمكن حذف بيانات لاعب متصل الآن — أخرجه من السيرفر أولاً' });
+
+  const { uuid } = await resolveUuid(name);
+  const worldName = getWorldName();
+  const results = {};
+
+  if ((parts.inventory || parts.enderChest || parts.xp)) {
+    if (!nbt) return res.status(500).json({ error: 'مكتبة prismarine-nbt غير مثبّتة على السيرفر (npm install)' });
+    try {
+      const p = path.join(SERVER_DIR, worldName, 'playerdata', `${uuid}.dat`);
+      if (fs.existsSync(p)) {
+        const buf = await fsp.readFile(p);
+        const { parsed } = await nbt.parse(buf);
+        const root = parsed.value;
+        if (parts.inventory && root.Inventory) {
+          root.Inventory.value.value = []; // تفريغ كامل: المخزون الرئيسي + الدروع + اليد الثانية معاً
+          results.inventory = true;
+        }
+        if (parts.enderChest && root.EnderItems) {
+          root.EnderItems.value.value = [];
+          results.enderChest = true;
+        }
+        if (parts.xp) {
+          if (root.XpLevel) root.XpLevel.value = 0;
+          if (root.XpTotal) root.XpTotal.value = 0;
+          if (root.XpP) root.XpP.value = 0;
+          results.xp = true;
+        }
+        const outBuf = nbt.writeUncompressed(parsed, 'big');
+        await fsp.writeFile(p, zlib.gzipSync(outBuf));
+      } else {
+        results.fileNotFound = true;
+      }
+    } catch (e) {
+      return res.status(500).json({ error: 'فشل تعديل ملف اللاعب: ' + e.message });
+    }
+  }
+
+  if (parts.stats) {
+    try {
+      const p = path.join(SERVER_DIR, worldName, 'stats', `${uuid}.json`);
+      if (fs.existsSync(p)) await fsp.unlink(p);
+      results.stats = true;
+    } catch {}
+  }
+  if (parts.advancements) {
+    try {
+      const p = path.join(SERVER_DIR, worldName, 'advancements', `${uuid}.json`);
+      if (fs.existsSync(p)) await fsp.unlink(p);
+      results.advancements = true;
+    } catch {}
+  }
+  if (parts.panelHistory) {
+    const key = name.toLowerCase();
+    if (playersDB[key]) {
+      playersDB[key].deaths = [];
+      playersDB[key].teleports = [];
+      playersDirty = true;
+    }
+    results.panelHistory = true;
+  }
+
+  res.json({ success: true, results });
+});
+
 // ── Files API ─────────────────────────────────────────────────────────────────
 app.get('/api/files', requireAuth, async (req, res) => {
   const rel = String(req.query.path || '');
@@ -485,9 +977,9 @@ app.get('/api/files', requireAuth, async (req, res) => {
       .filter(e => !e.name.startsWith('.'))
       .map(async e => {
         const full = path.join(abs, e.name);
-        let size = 0;
-        try { if (e.isFile()) size = (await fsp.stat(full)).size; } catch {}
-        return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', size };
+        let size = 0, mtime = null;
+        try { const st = await fsp.stat(full); if (e.isFile()) size = st.size; mtime = st.mtime.getTime(); } catch {}
+        return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', size, mtime };
       }));
     files.sort((a, b) => {
       if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
@@ -561,6 +1053,23 @@ app.post('/api/files/delete', requireAuth, async (req, res) => {
     await fsp.rm(abs, { recursive: true, force: true });
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'فشل الحذف' }); }
+});
+
+// ── إعادة تسمية / نقل ملف أو مجلد ─────────────────────────────────────────────
+app.post('/api/files/rename', requireAuth, async (req, res) => {
+  const relFrom = String(req.body.path || '');
+  const newName = String(req.body.newName || '').trim();
+  const absFrom = safePath(relFrom);
+  if (!absFrom)  return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!newName || /[\\/]/.test(newName) || newName === '.' || newName === '..')
+    return res.status(400).json({ error: 'اسم غير صالح' });
+  const absTo = path.join(path.dirname(absFrom), newName);
+  if (!safePath(path.relative(SERVER_DIR, absTo))) return res.status(400).json({ error: 'مسار هدف غير صالح' });
+  try {
+    if (fs.existsSync(absTo)) return res.status(409).json({ error: 'يوجد ملف/مجلد بنفس الاسم' });
+    await fsp.rename(absFrom, absTo);
+    res.json({ success: true });
+  } catch { res.status(500).json({ error: 'فشل إعادة التسمية' }); }
 });
 
 // ── Backups API ───────────────────────────────────────────────────────────────
@@ -689,7 +1198,7 @@ app.post('/api/settings/properties', requireAuth, async (req, res) => {
 
 // ── Settings: startup (JVM) ───────────────────────────────────────────────────
 app.get('/api/settings/startup', requireAuth, (_req, res) => {
-  res.json(loadStartupCfg());
+  res.json({ ...loadStartupCfg(), totalRamGB: Math.round(os.totalmem() / (1024 ** 3)) });
 });
 
 app.post('/api/settings/startup', requireAuth, async (req, res) => {
@@ -838,6 +1347,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 function shutdown(signal) {
   console.log(`[Panel] ${signal} — stopping panel (NOT the MC server)...`);
+  if (playersDirty) savePlayersDBNow();
   if (logTailer)    { try { logTailer.kill(); } catch {} }
   if (tmuxMonitor)  clearInterval(tmuxMonitor);
   process.exit(0);
