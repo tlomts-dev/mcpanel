@@ -336,25 +336,35 @@ select.sel:focus{border-color:var(--accent2);}
 .pd-loc-coords{font-family:'IBM Plex Mono',monospace;direction:ltr;color:var(--accent2);}
 .pd-loc-meta{color:var(--muted);font-size:11px;}
 .pd-empty{text-align:center;color:var(--muted);padding:28px 10px;font-size:13px;line-height:1.7;}
-.mc-frame{background:#c6c6c6;border-radius:3px;padding:10px;box-shadow:inset -2px -2px 0 #373737,inset 2px 2px 0 #fff,inset -4px -4px 0 #8b8b8b,inset 4px 4px 0 #f5f5f5;margin-bottom:18px;}
-.mc-inv-layout{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;}
-.mc-armor-col{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;width:auto;}
-@media(max-width:420px){.mc-armor-col{grid-template-columns:repeat(2,1fr);}}
-.mc-main-slots{flex:1;min-width:220px;}
-.mc-slot-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;}
+.mc-frame{--mc-slot:50px;background:#c6c6c6;border-radius:3px;padding:10px;box-shadow:inset -2px -2px 0 #373737,inset 2px 2px 0 #fff,inset -4px -4px 0 #8b8b8b,inset 4px 4px 0 #f5f5f5;margin-bottom:18px;max-width:580px;}
+.mc-inv-layout{display:flex;gap:8px;align-items:flex-start;}
+.mc-armor-col{display:flex;flex-direction:column;gap:3px;}
+.mc-main-slots{flex:1;min-width:0;}
+.mc-slot-grid{display:grid;grid-template-columns:repeat(9,var(--mc-slot));gap:3px;}
 .mc-hotbar-sep{height:6px;}
-.mc-slot{background:#8b8b8b;box-shadow:inset -2px -2px 0 #373737,inset 2px 2px 0 #fff;aspect-ratio:1;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:28px;}
+.mc-slot{width:var(--mc-slot);height:var(--mc-slot);background:#8b8b8b;box-shadow:inset -2px -2px 0 #373737,inset 2px 2px 0 #fff;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+@media(max-width:480px){.mc-frame{--mc-slot:38px;}}
 .mc-slot.mc-slot-empty{cursor:default;}
-.mc-slot img{width:78%;height:78%;image-rendering:pixelated;object-fit:contain;}
-.mc-slot .mc-emoji-fb{display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:14px;}
-.mc-slot .mc-count{position:absolute;bottom:0;left:2px;color:#fff;font-size:11px;font-weight:900;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;font-family:'IBM Plex Mono',monospace;line-height:1;}
-.mc-slot .mc-dura-bar{position:absolute;bottom:1.5px;left:1.5px;right:1.5px;height:2px;background:#3d0a0a;}
+.mc-slot img{width:88%;height:88%;image-rendering:pixelated;object-fit:contain;}
+.mc-slot svg{width:88%;height:88%;}
+.mc-emoji-fb{display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:16px;}
+.mc-slot .mc-count{position:absolute;bottom:1px;left:2px;color:#fff;font-size:13px;font-weight:900;text-shadow:1.5px 1.5px 0 #000,-1px -1px 0 #000;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.mc-slot .mc-dura-bar{position:absolute;bottom:2px;left:2px;right:2px;height:2.5px;background:#3d0a0a;}
 .mc-slot .mc-dura-fill{height:100%;background:#7fd13b;}
 .mc-tooltip{position:fixed;background:#100010ee;border:2px solid #2d0a5e;border-radius:2px;padding:8px 10px;z-index:700;max-width:220px;box-shadow:0 8px 20px #000000aa;}
+.mc-tooltip.mc-tt-wide{max-width:310px;}
 .mc-tooltip .mc-tt-name{color:#fff;font-weight:700;font-size:13px;margin-bottom:4px;}
 .mc-tooltip.mc-tt-ench .mc-tt-name{color:#5fdcff;}
 .mc-tooltip .mc-tt-ench-line{color:#aa7fff;font-size:11px;line-height:1.6;}
+.mc-tooltip .mc-tt-trim-line{color:#e0c068;font-size:11px;line-height:1.6;}
 .mc-tooltip .mc-tt-dura{color:#bbb;font-size:11px;margin-top:4px;}
+.mc-tooltip .mc-tt-contents-label{color:#999;font-size:10px;margin-top:8px;margin-bottom:4px;}
+.mc-mini-grid{display:grid;grid-template-columns:repeat(9,28px);gap:3px;}
+.mc-mini-slot{width:28px;height:28px;background:#8b8b8b;box-shadow:inset -1px -1px 0 #373737,inset 1px 1px 0 #fff;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.mc-mini-slot img{width:85%;height:85%;image-rendering:pixelated;object-fit:contain;}
+.mc-mini-slot svg{width:85%;height:85%;}
+.mc-mini-slot .mc-emoji-fb{font-size:11px;}
+.mc-mini-slot .mc-mini-count{position:absolute;bottom:0;left:1px;color:#fff;font-size:9.5px;font-weight:900;text-shadow:1px 1px 0 #000;font-family:'IBM Plex Mono',monospace;line-height:1;}
 .pd-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
 @media(max-width:520px){.pd-stat-grid{grid-template-columns:1fr 1fr;}}
 .pd-stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center;}
@@ -1105,20 +1115,40 @@ function renderAllPlayersTable(){
 // ════════════ نافذة تفاصيل اللاعب ════════════
 var CAUSE_LABELS={ENTITY_ATTACK:'هجوم مباشر',PROJECTILE:'إصابة بمقذوف',FALL:'سقوط',FIRE:'حريق',FIRE_TICK:'احتراق مستمر',LAVA:'حمم بركانية',DROWNING:'غرق',SUFFOCATION:'اختناق',STARVATION:'جوع',VOID:'السقوط خارج العالم',LIGHTNING:'صاعقة',MAGIC:'سحر/تأثير',POISON:'سُم',WITHER:'ذبول',EXPLOSION:'انفجار',CONTACT:'ملامسة (كاكتوس ونحوه)',CRAMMING:'ازدحام كائنات',FLY_INTO_WALL:'اصطدام أثناء الطيران',HOT_FLOOR:'ماغما',DRAGON_BREATH:'نفَس التنين',FREEZE:'تجمّد',SONIC_BOOM:'انفجار صوتي (واردن)',CUSTOM:'سبب مخصص',SUICIDE:'أمر kill',THORNS:'شوك درع',FALLING_BLOCK:'كتلة ساقطة',COMMAND:'أمر (tp)',ENDER_PEARL:'لؤلؤة إندر',CHORUS_FRUIT:'ثمرة كورس',NETHER_PORTAL:'بوابة نذر',END_PORTAL:'بوابة الإند',END_GATEWAY:'بوابة عودة الإند',SPECTATE:'مراقبة',PLUGIN:'إضافة',UNKNOWN:'غير معروف'};
 function prettifyCause(raw){if(!raw)return 'غير معروف';var parts=String(raw).split(':');var base=CAUSE_LABELS[parts[0]]||parts[0];if(parts[1]==='PLAYER'&&parts[2])return base+' — اللاعب '+esc(parts[2]);if(parts[1]==='MOB'&&parts[2])return base+' — '+esc(parts[2]);return base;}
-function itemCategoryEmoji(id){var s=id.toLowerCase();if(/sword|trident/.test(s))return '⚔️';if(/pickaxe|axe|shovel|hoe/.test(s))return '⛏️';if(/bow|crossbow|arrow/.test(s))return '🏹';if(/helmet|chestplate|leggings|boots|shield|elytra/.test(s))return '🛡️';if(/potion/.test(s))return '🧪';if(/apple|bread|beef|porkchop|chicken|mutton|rabbit|fish|salmon|cod|carrot|potato|stew|soup|cake|cookie|melon|berries|pie/.test(s))return '🍖';if(/diamond|emerald|netherite|gold_ingot|iron_ingot|lapis|amethyst|quartz/.test(s))return '💎';if(/log|planks|stem/.test(s))return '🪵';if(/ore|stone|cobblestone|deepslate|blackstone/.test(s))return '🪨';if(/spawn_egg/.test(s))return '🥚';if(/music_disc/.test(s))return '💿';if(/book/.test(s))return '📖';return '📦';}
-function itemDisplayName(id){return String(id).split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');}
-var ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
-function toRoman(n){return ROMAN[n]||n;}
-var ENCHANT_LABELS={protection:'حماية',fire_protection:'حماية من النار',feather_falling:'سقوط بالريشة',blast_protection:'حماية من الانفجارات',projectile_protection:'حماية من المقذوفات',respiration:'التنفس',aqua_affinity:'تقارب الماء',thorns:'الأشواك',depth_strider:'عداء الأعماق',frost_walker:'السير على الجليد',binding_curse:'لعنة الالتصاق',sharpness:'الحدة',smite:'إبادة الموتى',bane_of_arthropods:'مبيد المفصليات',knockback:'الصد',fire_aspect:'اللهب',looting:'النهب',sweeping:'الحافة الكاسحة',sweeping_edge:'الحافة الكاسحة',efficiency:'الكفاءة',silk_touch:'اللمسة الحريرية',unbreaking:'عدم الكسر',fortune:'الحظ',power:'القوة',punch:'اللكم',flame:'اللهب',infinity:'اللانهاية',luck_of_the_sea:'حظ البحر',lure:'الإغراء',loyalty:'الولاء',impaling:'الاختراق',riptide:'المد',channeling:'التوجيه',multishot:'الطلقات المتعددة',piercing:'الاختراق',quick_charge:'الشحن السريع',soul_speed:'سرعة الروح',swift_sneak:'التسلل السريع',mending:'الإصلاح',vanishing_curse:'لعنة الزوال'};
-function enchantLabel(id){return ENCHANT_LABELS[id]||itemDisplayName(id);}
+function itemCategoryEmoji(id){var s=id.toLowerCase();if(/sword|trident/.test(s))return '⚔️';if(/pickaxe|axe|shovel|hoe/.test(s))return '⛏️';if(/bow|crossbow|arrow/.test(s))return '🏹';if(/helmet|chestplate|leggings|boots|shield|elytra/.test(s))return '🛡️';if(/potion/.test(s))return '🧪';if(/apple/.test(s))return '🍎';if(/bread|beef|porkchop|chicken|mutton|rabbit|fish|salmon|cod|carrot|potato|stew|soup|cake|cookie|melon|berries|pie/.test(s))return '🍖';if(/diamond|emerald|netherite|gold_ingot|iron_ingot|lapis|amethyst|quartz/.test(s))return '💎';if(/log|planks|stem/.test(s))return '🪵';if(/ore|stone|cobblestone|deepslate|blackstone/.test(s))return '🪨';if(/spawn_egg/.test(s))return '🥚';if(/music_disc/.test(s))return '💿';if(/book/.test(s))return '📖';return '📦';}
+// بعض العناصر لا تملك ملف نسيج خاصاً بها إطلاقاً في ملفات اللعبة نفسها — تفاحة الذهب
+// المسحورة مثلاً تستخدم بصرياً نفس نسيج التفاحة الذهبية العادية، ولمعان السحر فقط
+// هو ما يميّزها في اللعبة (يُضاف كتأثير رسم منفصل، لا كصورة). بدون هذا التحويل
+// كانت تفشل كل محاولات الجلب وتظهر كرمز تعبيري عام لا يشبهها.
+var ICON_ID_OVERRIDE={enchanted_golden_apple:'golden_apple'};
+// صناديق حقيقية (Chest/Ender Chest/Trapped Chest) تُرسَم داخل اللعبة كنموذج ثلاثي
+// الأبعاد مُبرمَج مباشرة، وليس من ملف صورة مسطّح — فلا يوجد أي ملف نسيج لها
+// إطلاقاً في مصادر اللعبة (تحقّقتُ مباشرة، فشل على مسارَي item وblock كليهما).
+// لذلك نرسم شكلاً مبسّطاً يدوياً بدل الاعتماد على رمز تعبيري عام لا يشبهها.
+var CUSTOM_ICON_SVG={
+  chest:'<svg viewBox="0 0 16 16"><rect x="1" y="6" width="14" height="8" rx="1" fill="#8B5A2B"/><rect x="1" y="6" width="14" height="8" rx="1" fill="none" stroke="#4A2E14" stroke-width="1"/><rect x="1" y="6" width="14" height="2.5" fill="#6B4423"/><rect x="6.5" y="7.5" width="3" height="2.5" rx="0.5" fill="#D4AF37"/></svg>',
+  trapped_chest:'<svg viewBox="0 0 16 16"><rect x="1" y="6" width="14" height="8" rx="1" fill="#8B5A2B"/><rect x="1" y="6" width="14" height="8" rx="1" fill="none" stroke="#8B2020" stroke-width="1"/><rect x="1" y="6" width="14" height="2.5" fill="#6B4423"/><rect x="6.5" y="7.5" width="3" height="2.5" rx="0.5" fill="#D4AF37"/></svg>',
+  ender_chest:'<svg viewBox="0 0 16 16"><rect x="1" y="6" width="14" height="8" rx="1" fill="#0D0D14"/><rect x="1" y="6" width="14" height="8" rx="1" fill="none" stroke="#6A2FD6" stroke-width="1"/><rect x="1" y="6" width="14" height="2.5" fill="#1A0B2E"/><rect x="6.5" y="7.5" width="3" height="2.5" rx="0.5" fill="#6A2FD6"/></svg>',
+};
 var ITEM_TEXTURE_BASE='https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.1/assets/minecraft/textures';
 function itemIconHtml(id){
-  var itemUrl=ITEM_TEXTURE_BASE+'/item/'+id+'.png';
-  var blockUrl=ITEM_TEXTURE_BASE+'/block/'+id+'.png';
+  if(CUSTOM_ICON_SVG[id])return CUSTOM_ICON_SVG[id];
+  var iconId=ICON_ID_OVERRIDE[id]||id;
+  var itemUrl=ITEM_TEXTURE_BASE+'/item/'+iconId+'.png';
+  var blockUrl=ITEM_TEXTURE_BASE+'/block/'+iconId+'.png';
   var emoji=itemCategoryEmoji(id);
   return '<img src="'+itemUrl+'" alt="" onerror="if(this.dataset.stage!==\'block\'){this.dataset.stage=\'block\';this.src=\''+blockUrl+'\';}else{this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}">'
     +'<span class="mc-emoji-fb">'+emoji+'</span>';
 }
+function itemDisplayName(id){return String(id).split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');}
+var ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+function toRoman(n){return ROMAN[n]||n;}
+var ENCHANT_LABELS={protection:'حماية',fire_protection:'حماية من النار',feather_falling:'سقوط بالريشة',blast_protection:'حماية من الانفجارات',projectile_protection:'حماية من المقذوفات',respiration:'التنفس',aqua_affinity:'تقارب الماء',thorns:'الأشواك',depth_strider:'عداء الأعماق',frost_walker:'السير على الجليد',binding_curse:'لعنة الالتصاق',sharpness:'الحدة',smite:'إبادة الموتى',bane_of_arthropods:'مبيد المفصليات',knockback:'الصد',fire_aspect:'اللهب',looting:'النهب',sweeping:'الحافة الكاسحة',sweeping_edge:'الحافة الكاسحة',efficiency:'الكفاءة',silk_touch:'اللمسة الحريرية',unbreaking:'عدم الكسر',fortune:'الحظ',power:'القوة',punch:'اللكم',flame:'اللهب',infinity:'اللانهاية',luck_of_the_sea:'حظ البحر',lure:'الإغراء',loyalty:'الولاء',impaling:'الاختراق',riptide:'المد',channeling:'التوجيه',multishot:'الطلقات المتعددة',piercing:'الاختراق',quick_charge:'الشحن السريع',soul_speed:'سرعة الروح',swift_sneak:'التسلل السريع',mending:'الإصلاح',vanishing_curse:'لعنة الزوال'};
+var TRIM_PATTERN_LABELS={sentry:'الحارس',dune:'الكثيب',coast:'الساحل',wild:'البرية',ward:'الحارس الروحي',eye:'العين',vex:'المزعج',tide:'المد والجزر',snout:'الخطم',rib:'الضلع',spire:'البرج',wayfinder:'مكتشف الطريق',shaper:'المُشكِّل',silence:'الصمت',raiser:'الرافع',host:'المضيف',flow:'التدفق',bolt:'الصاعقة'};
+var TRIM_MATERIAL_LABELS={quartz:'كوارتز',iron:'حديد',netherite:'نذرايت',redstone:'ريدستون',copper:'نحاس',gold:'ذهب',emerald:'زمرد',diamond:'ألماس',lapis:'لازورد',amethyst:'جمشت',resin:'راتنج'};
+function trimPatternLabel(id){return TRIM_PATTERN_LABELS[id]||itemDisplayName(id);}
+function trimMaterialLabel(id){return TRIM_MATERIAL_LABELS[id]||itemDisplayName(id);}
+function enchantLabel(id){return ENCHANT_LABELS[id]||itemDisplayName(id);}
 // يخزَّن هنا كل عنصر ظاهر في تبويب المخزون/الصندوق السحري الحالي، للرجوع إليه عند فتح تفاصيله بالنقر
 var _pdTooltipItems=[];
 function mcSlotHtml(it){
@@ -1133,17 +1163,30 @@ function mcSlotHtml(it){
   return '<div class="mc-slot" data-invidx="'+idx+'">'+itemIconHtml(it.id)+duraHtml+(it.count>1?'<span class="mc-count">'+it.count+'</span>':'')+'</div>';
 }
 function mcEmptySlotHtml(){return '<div class="mc-slot mc-slot-empty"></div>';}
+function miniItemGridHtml(items){
+  var bySlot={};(items||[]).forEach(function(it){if(it.count>0)bySlot[it.slot]=it;});
+  var html='';
+  for(var s=0;s<27;s++){
+    var it=bySlot[s];
+    if(it)html+='<div class="mc-mini-slot">'+itemIconHtml(it.id)+(it.count>1?'<span class="mc-mini-count">'+it.count+'</span>':'')+'</div>';
+    else html+='<div class="mc-mini-slot"></div>';
+  }
+  return '<div class="mc-mini-grid">'+html+'</div>';
+}
 function showItemTooltip(idx,el){
   var it=_pdTooltipItems[idx];if(!it)return;
   closeItemTooltip();
   var hasEnch=it.enchantments&&it.enchantments.length>0;
+  var hasContents=it.contents&&it.contents.some(function(x){return x.count>0;});
   var tip=document.createElement('div');
   tip.id='mc-item-tooltip';
-  tip.className='mc-tooltip'+(hasEnch?' mc-tt-ench':'');
+  tip.className='mc-tooltip'+(hasEnch?' mc-tt-ench':'')+(hasContents?' mc-tt-wide':'');
   var html='<div class="mc-tt-name">'+esc(itemDisplayName(it.id))+'</div>';
+  if(it.trim)html+='<div class="mc-tt-trim-line">زخرفة: '+esc(trimPatternLabel(it.trim.pattern))+' ('+esc(trimMaterialLabel(it.trim.material))+')</div>';
   if(hasEnch)html+=it.enchantments.map(function(e){return '<div class="mc-tt-ench-line">'+esc(enchantLabel(e.id))+' '+toRoman(e.level)+'</div>';}).join('');
   if(it.durability&&it.durability.max)html+='<div class="mc-tt-dura">المتانة: '+it.durability.current+' / '+it.durability.max+'</div>';
   html+='<div class="mc-tt-dura" style="direction:ltr;text-align:left;opacity:.6;">×'+it.count+'</div>';
+  if(hasContents){html+='<div class="mc-tt-contents-label">المحتويات:</div>'+miniItemGridHtml(it.contents);}
   tip.innerHTML=html;
   document.body.appendChild(tip);
   var r=el.getBoundingClientRect();

@@ -348,6 +348,22 @@ function buildPlayerDataResult(d, live) {
       const dmg = it.components?.['minecraft:damage'] ?? it.tag?.Damage ?? 0;
       result.durability = { current: Math.max(0, maxDur - dmg), max: maxDur };
     }
+    // زخرفة الدروع (Trim) — أفضل جهد فقط؛ شكل NBT الدقيق قد يختلف بين الإصدارات
+    try {
+      const trim = it.components?.['minecraft:trim'];
+      if (trim) {
+        const pattern  = (typeof trim.pattern  === 'string' ? trim.pattern  : trim.pattern?.key  || trim.pattern?.id  || '').replace('minecraft:', '');
+        const material = (typeof trim.material === 'string' ? trim.material : trim.material?.key || trim.material?.id || '').replace('minecraft:', '');
+        if (pattern && material) result.trim = { pattern, material };
+      }
+    } catch {}
+    // محتويات صندوق شولكر متداخل — أفضل جهد فقط
+    try {
+      const container = it.components?.['minecraft:container'];
+      if (Array.isArray(container)) {
+        result.contents = container.filter(e => e?.item?.id).map(e => ({ slot: e.slot ?? 0, ...mkItem(e.item) }));
+      }
+    } catch {}
     return result;
   };
 
@@ -394,7 +410,10 @@ function normalizeHttpPlayerData(j) {
     enchanted: !!it.enchanted,
     enchantments: Array.isArray(it.enchantments) ? it.enchantments : [],
     durability: it.durability || null,
+    trim: it.trim || null,
+    contents: Array.isArray(it.contents) ? it.contents.map(mkSlotItem).filter(Boolean) : undefined,
   } : null;
+  const mkSlotItem = it => it ? { slot: it.slot ?? 0, ...mkItem(it) } : null;
   return {
     available: true,
     live: true,
@@ -406,19 +425,13 @@ function normalizeHttpPlayerData(j) {
     xpLevel: j.xpLevel ?? null,
     xpTotal: j.xpTotal ?? null,
     gameMode: gmMap[j.gameMode] ?? null,
-    inventory: Array.isArray(j.inventory) ? j.inventory.map(it => ({
-      slot: it.slot ?? 0, id: String(it.id || ''), count: it.count ?? 1, enchanted: !!it.enchanted,
-      enchantments: Array.isArray(it.enchantments) ? it.enchantments : [], durability: it.durability || null,
-    })) : [],
+    inventory: Array.isArray(j.inventory) ? j.inventory.map(mkSlotItem) : [],
     armor: {
       helmet: mkItem(j.armor?.helmet), chestplate: mkItem(j.armor?.chestplate),
       leggings: mkItem(j.armor?.leggings), boots: mkItem(j.armor?.boots),
     },
     offhand: mkItem(j.offhand),
-    enderChest: Array.isArray(j.enderChest) ? j.enderChest.map(it => ({
-      slot: it.slot ?? 0, id: String(it.id || ''), count: it.count ?? 1, enchanted: !!it.enchanted,
-      enchantments: Array.isArray(it.enchantments) ? it.enchantments : [], durability: it.durability || null,
-    })) : [],
+    enderChest: Array.isArray(j.enderChest) ? j.enderChest.map(mkSlotItem) : [],
   };
 }
 
@@ -816,8 +829,11 @@ const PLAYER_ACTIONS = {
   ban:   p => `ban ${p}`,
   kick:  p => `kick ${p}`,
   unban: p => `pardon ${p}`,
-  heal:  p => `data merge entity ${p} {Health:20.0f}`,
-  feed:  p => `data merge entity ${p} {foodLevel:20,foodSaturationLevel:20.0f}`,
+  // ملاحظة: Minecraft يمنع نهائياً وبشكل متعمد أي كتابة لبيانات اللاعب عبر
+  // data merge/modify (يرجع خطأ "Unable to modify player data" دائماً، بغض
+  // النظر عن الإصدار أو الإعدادات) — البديل الرسمي الوحيد هو /effect
+  heal:  p => `effect give ${p} minecraft:instant_health 1 9`,
+  feed:  p => `effect give ${p} minecraft:saturation 1 9`,
   kill:  p => `kill ${p}`,
 };
 Object.entries(PLAYER_ACTIONS).forEach(([action, fn]) => {
