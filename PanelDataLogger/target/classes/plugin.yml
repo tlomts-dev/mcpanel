@@ -1,0 +1,8 @@
+name: PanelDataLogger
+version: 1.0.0
+main: dev.tlomts.paneldatalogger.PanelDataLogger
+api-version: '1.21'
+author: The Legend Of MTS Dev
+description: >
+  يسجّل إحداثيات كل حالة وفاة وكل عملية انتقال (بوابات/لآلئ إندر/أوامر) لكل
+  لاعب إلى كونسول السيرفر بصيغة تقرأها MC Panel، لعرضها في صفحة تفاصيل اللاعب.
