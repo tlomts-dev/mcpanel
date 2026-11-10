@@ -1,7 +1,7 @@
 name: PanelDataLogger
 version: 1.0.0
 main: dev.tlomts.paneldatalogger.PanelDataLogger
-api-version: '1.21'
+api-version: '26.3'
 author: The Legend Of MTS Dev
 description: >
   يسجّل إحداثيات كل حالة وفاة وكل عملية انتقال (بوابات/لآلئ إندر/أوامر) لكل

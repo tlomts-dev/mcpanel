@@ -1,5 +1,7 @@
 # PanelDataLogger
 
+**العربية** | [English](README.en.md)
+
 إضافة Spigot/Paper صغيرة ومرافقة لـ **MC Panel**، بمهمتين:
 
 ## 1) خادم HTTP داخلي — بيانات اللاعبين المتصلين حيّاً
@@ -46,6 +48,8 @@ GET http://127.0.0.1:28281/player/<name>
 
 ## البناء
 
+يحتاج **JDK 25 فأعلى** (ماينكرافت 26.x يعمل على Java 25) وMaven.
+
 ```bash
 cd PanelDataLogger
 mvn package
@@ -53,7 +57,7 @@ mvn package
 
 الناتج: `target/PanelDataLogger.jar`
 
-> إذا ظهر خطأ في تنزيل `spigot-api`: عدّل `<spigot.api.version>` في
+> الإضافة مبنية على `spigot-api 26.3-R0.1-SNAPSHOT`. إذا ظهر خطأ في تنزيل `spigot-api`: عدّل `<spigot.api.version>` في
 > `pom.xml` لتطابق نسخة الـ jar التي بنيتها عبر BuildTools لتشغيل سيرفر
 > 2b2t Arab نفسه (هي غالباً موجودة أصلاً في `~/.m2` المحلي عندك).
 

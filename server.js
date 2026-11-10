@@ -31,7 +31,7 @@ const PANEL_HTTP_PORT = parseInt(process.env.PANEL_HTTP_PORT || '28281', 10);
 // ── Config ────────────────────────────────────────────────────────────────────
 const PORT        = parseInt(process.env.PORT || '8080', 10);
 const SERVER_DIR  = path.resolve(process.env.MC_DIR || '/opt/minecraft');
-const SERVER_JAR  = process.env.MC_JAR || 'spigot-1.21.11.jar';
+const SERVER_JAR  = process.env.MC_JAR || 'spigot-26.3.jar';
 const BACKUPS_DIR = path.join(SERVER_DIR, 'backups');
 const STARTUP_CFG = path.join(SERVER_DIR, '.panel-startup.json');
 const PLAYERS_DB_FILE = path.join(SERVER_DIR, '.panel-players.json');
@@ -1110,7 +1110,7 @@ app.post('/api/backups/create', requireAuth, async (_req, res) => {
   const out   = path.join(BACKUPS_DIR, name);
   try {
     const output  = fs.createWriteStream(out);
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = new archiver.ZipArchive({ zlib: { level: 6 } });
     archive.pipe(output);
     for (const w of ['world', 'world_nether', 'world_the_end']) {
       const p = path.join(SERVER_DIR, w);

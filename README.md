@@ -1,5 +1,9 @@
 # MC Panel
 
+**العربية** | [English](README.en.md)
+
+محدّث ليدعم أحدث إصدار من ماينكرافت: **26.3** (يعمل على Java 25).
+
 لوحة تحكم ويب لإدارة سيرفر Minecraft (Paper/Spigot) من المتصفح، بدل الدخول بـ SSH كل مرة. تتحكم بالسيرفر عن طريق جلسة tmux، وتعرض الكونسول واللوق مباشرة عبر WebSocket.
 
 ## المميزات
@@ -25,8 +29,8 @@
 
 - Linux مع tmux مثبت
 - Node.js إصدار 18 فأعلى
-- Java (لتشغيل سيرفر Minecraft نفسه)
-- سيرفر Paper/Spigot جاهز مسبقًا: ملف jar وعوالمه موجودين في مجلد على الجهاز
+- Java 25 أو أحدث (لتشغيل سيرفر Minecraft نفسه، الإصدار 26.x يحتاج Java 25)
+- سيرفر Paper/Spigot جاهز مسبقًا (مُختبر مع إصدار 26.3): ملف jar وعوالمه موجودين في مجلد على الجهاز
 
 اللوحة لا تُنزّل أو تُعدّ سيرفر Minecraft لك، هي فقط تدير سيرفر موجود مسبقًا.
 
@@ -53,8 +57,11 @@ cp .env.example .env
 ## التشغيل
 
 ```bash
-npm start
+npm start          # الواجهة العربية (RTL)
+npm run start:en   # English interface (LTR)
 ```
+
+النسختان (العربية والإنجليزية) متطابقتان في الميزات وتعملان بنفس إعدادات `.env`. النسخة الإنجليزية موجودة في مجلد `en/`. شغّل واحدة منهما فقط على نفس المنفذ.
 
 اللوحة تفتح على المنفذ المحدد في `PORT` (افتراضيًا 8080):
 
@@ -78,7 +85,7 @@ pm2 save
 |---|---|---|
 | `PORT` | منفذ اللوحة | `8080` |
 | `MC_DIR` | مجلد سيرفر Minecraft (فيه الـ jar والعوالم)، مستقل عن مكان اللوحة | `/opt/minecraft` |
-| `MC_JAR` | اسم ملف jar السيرفر بالضبط | `spigot-1.21.11.jar` |
+| `MC_JAR` | اسم ملف jar السيرفر بالضبط | `spigot-26.3.jar` |
 | `TMUX_SESSION` | اسم جلسة tmux اللي يشتغل فيها السيرفر | `mcserver` |
 | `SESSION_SECRET` | مفتاح تشفير الجلسات. لو فاضي، يتولد عشوائي عند كل تشغيل، فيسجل خروج الجميع بعد كل إعادة تشغيل للوحة | عشوائي |
 | `ADMIN_USER` | اسم مستخدم الدخول | `admin` |
@@ -99,13 +106,17 @@ node -e "console.log(require('bcryptjs').hashSync('كلمة-المرور-هنا'
 
 ```
 panel/
-├── server.js          سيرفر Express + WebSocket، فيه كل الـ API
+├── server.js          سيرفر Express + WebSocket، فيه كل الـ API (النسخة العربية)
 ├── package.json
 ├── .env.example
-└── public/
-    └── index.html      واجهة اللوحة (HTML وCSS وJS في ملف واحد)
+├── public/
+│   └── index.html      واجهة اللوحة العربية (HTML وCSS وJS في ملف واحد)
+├── en/                 النسخة الإنجليزية الكاملة
+│   ├── server.js
+│   └── public/index.html
+└── screenshots/        لقطات الشاشة (ar/ و en/)
 
-PanelDataLogger/         إضافة Java مرافقة اختيارية (مشروع Maven منفصل)
+PanelDataLogger/         إضافة Java مرافقة اختيارية (مشروع Maven منفصل، مبنية على 26.3)
 ├── pom.xml
 ├── README.md
 └── src/main/...
@@ -145,10 +156,49 @@ curl http://127.0.0.1:28281/health   # المتوقع: {"status":"ok"}
 
 ## لقطات الشاشة
 
-![لقطة من اللوحة](screenshots/s182010.png) ![لقطة من اللوحة](screenshots/s182029.png)
-![لقطة من اللوحة](screenshots/s182048.png) ![لقطة من اللوحة](screenshots/s182058.png)
-![لقطة من اللوحة](screenshots/s182110.png) ![لقطة من اللوحة](screenshots/s182132.png)
-![لقطة من اللوحة](screenshots/s182145.png)
+**نظرة عامة**
+
+![نظرة عامة](screenshots/ar/overview.png)
+
+**الكونسول**
+
+![الكونسول](screenshots/ar/console.png)
+
+**اللاعبون**
+
+![اللاعبون](screenshots/ar/players.png)
+
+**تفاصيل اللاعب: الصحة والخبرة**
+
+![تفاصيل اللاعب: الصحة والخبرة](screenshots/ar/player-health.png)
+
+**تفاصيل اللاعب: المخزون**
+
+![تفاصيل اللاعب: المخزون](screenshots/ar/player-inventory.png)
+
+**تفاصيل اللاعب: الإحصائيات**
+
+![تفاصيل اللاعب: الإحصائيات](screenshots/ar/player-stats.png)
+
+**تفاصيل اللاعب: أماكن الموت**
+
+![تفاصيل اللاعب: أماكن الموت](screenshots/ar/player-deaths.png)
+
+**مدير الملفات**
+
+![مدير الملفات](screenshots/ar/files.png)
+
+**النسخ الاحتياطية**
+
+![النسخ الاحتياطية](screenshots/ar/backups.png)
+
+**الإعدادات**
+
+![الإعدادات](screenshots/ar/settings.png)
+
+**الوضع الفاتح**
+
+![الوضع الفاتح](screenshots/ar/overview-light.png)
 
 ## ملاحظات أمنية
 

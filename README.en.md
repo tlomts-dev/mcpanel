@@ -1,0 +1,199 @@
+# MC Panel
+
+[العربية](README.md) | **English**
+
+A web control panel for managing a Minecraft (Paper/Spigot) server from the browser instead of logging in over SSH every time. It controls the server through a tmux session and streams the console and log live over WebSocket.
+
+Updated for the latest Minecraft release: **26.3** (runs on Java 25).
+
+The project ships as two complete editions with identical features: the Arabic interface (RTL, repository root) and the English interface (LTR, in the `en/` folder).
+
+## Features
+
+- Start, stop and restart the server
+- Automatic restart if the server dies on its own (crash, OOM, etc.), with no restart when the stop was requested from the panel
+- Live console: send commands and follow the log in real time
+- Live stats every second: TPS, RAM and CPU usage, uptime
+- Player management: op, deop, ban, kick, pardon
+- View the operators (ops), banned players and whitelist lists
+- Full file manager: browse, open and edit, upload, download, delete. Access is confined to the server folder
+- Backups: create (worlds + server.properties + ops/whitelist/bans), restore, delete, download
+- Edit server.properties and memory/JVM settings (Xms, Xmx, G1GC, extra flags) straight from the UI
+- Single-user login, bcrypt-hashed password, with a limit on failed attempts
+- Dark and light themes
+- The internal `tps` and `list` commands (used to refresh TPS and the player list) are hidden from the console, their result goes straight to the UI
+- Permanent log of everyone who ever joined (not only who is online now), with an "All players" tab
+- A dedicated player details page: health and XP with Heal/Feed/Kill buttons, inventory, armor and offhand with real in-game icons, a separate ender chest, location, full statistics, a death and teleport history, and selective deletion of player data (inventory/ender chest/XP/statistics/advancements/panel history). Live data for online players (including statistics) and the death/teleport history need the bundled PanelDataLogger plugin (see below)
+- File manager: the whole row is clickable to open, secondary actions (download, rename, delete) live in a ⋮ menu
+- Extended server.properties editor covering about 50 categorized properties, plus an "Extra properties" section that edits any other key without opening the file manager
+
+## Requirements
+
+- Linux with tmux installed
+- Node.js 18 or newer
+- Java 25 or newer (to run the Minecraft server itself; 26.x needs Java 25)
+- A ready Paper/Spigot server (tested with 26.3): the jar and the worlds already sitting in a folder on the machine
+
+The panel does not download or set up a Minecraft server for you, it only manages an existing one.
+
+## Installation
+
+```bash
+git clone https://github.com/tlomts-dev/mcpanel panel
+cd panel
+npm install
+cp .env.example .env
+```
+
+Then open `.env` and edit the values, especially `MC_DIR` (the real Minecraft server path), `MC_JAR` (the jar file name) and `ADMIN_PASS`.
+
+> **Updating an existing install?** After `git pull`, run `npm install` again: a dependency (`prismarine-nbt`) was added for reading player files. Without it the panel still works, only the inventory/current-location tab of the player details page is disabled with an explanatory message.
+>
+> For live data of **online** players (instant inventory/location/health with no waiting for a save), install the bundled `PanelDataLogger` plugin (see its section below) and set `PANEL_HTTP_PORT` in `.env` to match its port. Without it, this data is read from the last saved file only.
+
+## Running
+
+```bash
+npm run start:en   # English interface (LTR)
+npm start          # Arabic interface (RTL)
+```
+
+Run only one of the two on a given port. The panel opens on the port set in `PORT` (default 8080):
+
+```
+http://<machine-address>:8080
+```
+
+Sign in with `ADMIN_USER` and `ADMIN_PASS` from `.env`.
+
+For permanent production use, run it under a process manager instead of directly in the terminal:
+
+```bash
+npm install -g pm2
+pm2 start en/server.js --name mc-panel
+pm2 save
+```
+
+## Environment variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Panel port | `8080` |
+| `MC_DIR` | Minecraft server folder (jar and worlds), independent of where the panel lives | `/opt/minecraft` |
+| `MC_JAR` | Exact file name of the server jar | `spigot-26.3.jar` |
+| `TMUX_SESSION` | Name of the tmux session the server runs in | `mcserver` |
+| `SESSION_SECRET` | Session encryption key. If empty, a random one is generated at each start, so everyone is logged out after every panel restart | random |
+| `ADMIN_USER` | Login username | `admin` |
+| `ADMIN_PASS` | Password, plain text | - |
+| `ADMIN_HASH` | Ready-made bcrypt hash used instead of `ADMIN_PASS` when present | - |
+
+Generate a `SESSION_SECRET`:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Generate an `ADMIN_HASH` instead of storing the password in plain text:
+```bash
+node -e "console.log(require('bcryptjs').hashSync('your-password-here', 12))"
+```
+
+## Project layout
+
+```
+panel/
+├── server.js          Express + WebSocket server with the whole API (Arabic edition)
+├── package.json
+├── .env.example
+├── public/
+│   └── index.html      Arabic panel UI (HTML, CSS and JS in one file)
+├── en/                 The complete English edition
+│   ├── server.js
+│   └── public/index.html
+└── screenshots/        Screenshots (ar/ and en/)
+
+PanelDataLogger/         Optional companion Java plugin (separate Maven project, built against 26.3)
+├── pom.xml
+├── README.md / README.en.md
+└── src/main/...
+```
+
+## PanelDataLogger plugin: live data + death and teleport locations
+
+This plugin (the `PanelDataLogger/` folder next to this project) has two jobs:
+
+1. **An internal HTTP server (`127.0.0.1` only)** that serves the inventory/location/health of any **currently online** player straight from their in-memory object. It is more accurate and much faster than waiting for Minecraft to save the file to disk. Without the plugin, this data is read from the last saved file only (it may lag until the next `/save-all` or until they leave).
+2. **Logging death and teleport coordinates** to the console (hidden from you, parsed automatically). This is needed separately because Minecraft writes these coordinates nowhere, neither in the console nor through the HTTP server above (which only shows the live state, not history).
+
+Full statistics (deaths as a count, kills, distances) always work without the plugin, because they come from a separate standard stats file.
+
+```bash
+cd PanelDataLogger
+mvn package   # details and pom.xml tweaks in PanelDataLogger/README.en.md
+cp target/PanelDataLogger.jar /opt/minecraft/plugins/
+```
+
+After restarting the server, make sure `PANEL_HTTP_PORT` in the panel's `.env` matches `port` in `plugins/PanelDataLogger/config.yml` (both `28281` by default), then check from the machine itself:
+
+```bash
+curl http://127.0.0.1:28281/health   # Expected: {"status":"ok"}
+```
+
+Full details in `PanelDataLogger/README.en.md`.
+
+## Screenshots
+
+**Overview**
+
+![Overview](screenshots/en/overview.png)
+
+**Console**
+
+![Console](screenshots/en/console.png)
+
+**Players**
+
+![Players](screenshots/en/players.png)
+
+**Player details: health and XP**
+
+![Player health](screenshots/en/player-health.png)
+
+**Player details: inventory**
+
+![Player inventory](screenshots/en/player-inventory.png)
+
+**Player details: statistics**
+
+![Player statistics](screenshots/en/player-stats.png)
+
+**Player details: death locations**
+
+![Death locations](screenshots/en/player-deaths.png)
+
+**File manager**
+
+![Files](screenshots/en/files.png)
+
+**Backups**
+
+![Backups](screenshots/en/backups.png)
+
+**Settings**
+
+![Settings](screenshots/en/settings.png)
+
+**Light theme**
+
+![Light theme](screenshots/en/overview-light.png)
+
+## Security notes
+
+The panel gives full control of the server: start and stop, deleting files, running console commands. Do not expose the port directly to the internet. Prefer a reverse proxy (nginx or Caddy) with an HTTPS certificate in front, or restrict access with a firewall or VPN.
+
+Cookies are set `httpOnly` and `sameSite: strict`, but without an explicit `secure` flag in the code. Full protection needs real HTTPS at the reverse proxy layer.
+
+Change the default `ADMIN_PASS` before any real use. Command filtering and the file manager include protection against path traversal and shell injection, but this does not replace restricting who can reach the panel in the first place.
+
+## License
+
+MIT, see the `LICENSE` file.

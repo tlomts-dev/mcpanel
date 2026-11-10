@@ -1,10 +1,11 @@
 {
   "name": "mc-panel",
-  "version": "1.0.0",
-  "description": "لوحة تحكم ويب لإدارة سيرفر Minecraft (تشغيل/إيقاف، كونسول مباشر، إدارة لاعبين، ملفات، نسخ احتياطية)",
+  "version": "1.1.0",
+  "description": "لوحة تحكم ويب لإدارة سيرفر Minecraft (عربي + English): تشغيل/إيقاف، كونسول مباشر، إدارة لاعبين، ملفات، نسخ احتياطية | Web control panel for Minecraft servers (Arabic + English)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:en": "node en/server.js"
   },
   "engines": {
     "node": ">=18"
