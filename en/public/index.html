@@ -228,6 +228,9 @@ label.lbl{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font
 .player-card:hover{border-color:var(--accent2);}
 .player-avatar{width:36px;height:36px;border-radius:4px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .player-info{flex:1;min-width:0;}
+.player-name-row{display:flex;align-items:center;gap:6px;min-width:0;}
+.copy-btn{flex-shrink:0;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:1px 6px;font-size:12px;line-height:1.4;cursor:pointer;transition:.15s;}
+.copy-btn:hover{color:var(--accent);border-color:var(--accent);}
 .player-name{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .player-status{font-size:10px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px;}
 .player-online-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;}
@@ -1069,7 +1072,7 @@ function renderPlayers(){
   var list=Array.from(players.entries()).filter(function(e){return !filter||e[0].toLowerCase().indexOf(filter)>-1||e[1].toLowerCase().indexOf(filter)>-1;});
   if(!list.length){grid.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">'+(players.size?'No results':'No players online')+'</div>';return;}
   grid.innerHTML='';
-  list.forEach(function(entry){var name=entry[0],display=entry[1],safeName=esc(name),safeDisplay=esc(display),card=document.createElement('div');card.className='player-card';card.setAttribute('data-popen',name);card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name">'+safeDisplay+'</div><div class="player-status"><div class="player-online-dot"></div>Online</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safeName+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safeName+'">Kick</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safeName+'">Ban</button></div></div>';grid.appendChild(card);});
+  list.forEach(function(entry){var name=entry[0],display=entry[1],safeName=esc(name),safeDisplay=esc(display),card=document.createElement('div');card.className='player-card';card.setAttribute('data-popen',name);card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name-row"><div class="player-name">'+safeDisplay+'</div><button class="copy-btn" data-pcopy="'+safeName+'" title="Copy name">⧉</button></div><div class="player-status"><div class="player-online-dot"></div>Online</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safeName+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safeName+'">Kick</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safeName+'">Ban</button></div></div>';grid.appendChild(card);});
 }
 async function pa(action){var p=document.getElementById('pname').value.trim();if(!p){toast('Enter a player name','err');return;}if(!PLAYER_RE.test(p)){toast('Invalid name','err');return;}await qp(action,p);}
 async function qp(action,player){try{await apiPost('/api/player/'+action,{player:player});toast(action+': '+esc(player));}catch(e){toast(e.message,'err');}}
@@ -1634,6 +1637,8 @@ document.addEventListener('click',function(e){
   if(kb){openFileMenu(parseInt(kb.getAttribute('data-fkebab')),kb);return;}
   if(openMenuSlot!==null&&!e.target.closest('.file-menu'))closeFileMenu();
 
+  var pc=e.target.closest('[data-pcopy]');
+  if(pc){e.stopPropagation();copyText(pc.getAttribute('data-pcopy'));return;}
   var pb=e.target.closest('[data-pa][data-pn]');
   if(pb){qp(pb.getAttribute('data-pa'),pb.getAttribute('data-pn'));return;}
   var ub=e.target.closest('[data-unban]');
