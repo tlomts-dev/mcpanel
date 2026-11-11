@@ -239,9 +239,20 @@ function getWorldName() {
   return 'world';
 }
 
+// Minecraft 26.1+ moved per-player files into <world>/players/{data,stats,advancements}/.
+// Older versions keep them in <world>/{playerdata,stats,advancements}/. Support both layouts.
+function playerFilePath(world, kind, uuid) {
+  const ext = kind === 'playerdata' ? '.dat' : '.json';
+  const modern = path.join(SERVER_DIR, world, 'players', kind === 'playerdata' ? 'data' : kind, uuid + ext);
+  const legacy = path.join(SERVER_DIR, world, kind, uuid + ext);
+  if (fs.existsSync(modern)) return modern;
+  if (fs.existsSync(legacy)) return legacy;
+  return fs.existsSync(path.join(SERVER_DIR, world, 'players')) ? modern : legacy;
+}
+
 async function readPlayerStats(uuid) {
   try {
-    const p = path.join(SERVER_DIR, getWorldName(), 'stats', `${uuid}.json`);
+    const p = playerFilePath(getWorldName(), 'stats', uuid);
     if (!fs.existsSync(p)) return null;
     const j = JSON.parse(await fsp.readFile(p, 'utf8'));
     const custom = j.stats?.['minecraft:custom'] || {};
@@ -429,7 +440,7 @@ async function queryPluginHttp(name) {
 async function readPlayerDataFromFile(uuid) {
   if (!nbt) return { available: false, reason: 'The prismarine-nbt library is not installed on the server (npm install)' };
   try {
-    const p = path.join(SERVER_DIR, getWorldName(), 'playerdata', `${uuid}.dat`);
+    const p = playerFilePath(getWorldName(), 'playerdata', uuid);
     if (!fs.existsSync(p)) return { available: false, reason: 'No data file at path: ' + p };
     const buf = await fsp.readFile(p);
     const { parsed } = await nbt.parse(buf);
@@ -866,8 +877,8 @@ app.get('/api/players/detail', requireAuth, async (req, res) => {
     stats, data,
     debug: {
       worldName, uuidGuessed: guessed,
-      statsPath: path.join(SERVER_DIR, worldName, 'stats', `${uuid}.json`),
-      playerDataPath: path.join(SERVER_DIR, worldName, 'playerdata', `${uuid}.dat`),
+      statsPath: playerFilePath(worldName, 'stats', uuid),
+      playerDataPath: playerFilePath(worldName, 'playerdata', uuid),
     },
   });
 });
@@ -886,7 +897,7 @@ app.post('/api/players/delete-data', requireAuth, async (req, res) => {
   if ((parts.inventory || parts.enderChest || parts.xp)) {
     if (!nbt) return res.status(500).json({ error: 'The prismarine-nbt library is not installed on the server (npm install)' });
     try {
-      const p = path.join(SERVER_DIR, worldName, 'playerdata', `${uuid}.dat`);
+      const p = playerFilePath(worldName, 'playerdata', uuid);
       if (fs.existsSync(p)) {
         const buf = await fsp.readFile(p);
         const { parsed } = await nbt.parse(buf);
@@ -917,14 +928,14 @@ app.post('/api/players/delete-data', requireAuth, async (req, res) => {
 
   if (parts.stats) {
     try {
-      const p = path.join(SERVER_DIR, worldName, 'stats', `${uuid}.json`);
+      const p = playerFilePath(worldName, 'stats', uuid);
       if (fs.existsSync(p)) await fsp.unlink(p);
       results.stats = true;
     } catch {}
   }
   if (parts.advancements) {
     try {
-      const p = path.join(SERVER_DIR, worldName, 'advancements', `${uuid}.json`);
+      const p = playerFilePath(worldName, 'advancements', uuid);
       if (fs.existsSync(p)) await fsp.unlink(p);
       results.advancements = true;
     } catch {}
