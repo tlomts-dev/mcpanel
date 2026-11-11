@@ -689,5 +689,8 @@
  "ui.btn_wl_on": "✅ Enable",
  "ui.btn_wl_off": "❌ Disable",
  "ui.toast_wl_on": "Enable Whitelist",
- "ui.toast_wl_off": "Disable Whitelist"
+ "ui.toast_wl_off": "Disable Whitelist",
+ "ui.pl_tab_installed": "Installed",
+ "ui.pl_tab_browse": "Browse plugins",
+ "ui.pl_popular": "Most downloaded (Modrinth)"
 }

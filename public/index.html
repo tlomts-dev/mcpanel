@@ -982,15 +982,23 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
       </div>
 
       <div class="sub-page" id="settings-plugins">
-        <div class="card">
-          <div class="card-header"><div class="card-title">@@ui.installed_plugins@@</div><span id="pl-ver" style="font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span></div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.enabling_disabling_and_deleting_need_a_serve@@</div>
-          <div id="pl-list"></div>
+        <div class="sub-tabs">
+          <div class="sub-tab active" id="pl-tab-installed" onclick="plTab('installed')">@@ui.pl_tab_installed@@</div>
+          <div class="sub-tab" id="pl-tab-browse" onclick="plTab('browse')">@@ui.pl_tab_browse@@</div>
         </div>
-        <div class="card">
-          <div class="card-title" style="margin-bottom:10px;">@@ui.install_a_plugin@@</div>
-          <div class="inp-row"><input class="inp" id="pl-q" placeholder="@@ui.search_modrinth@@" onkeydown="if(event.key==='Enter')searchPlugins()"><button class="btn btn-primary" style="flex:0 0 auto;" onclick="searchPlugins()">@@ui.search@@</button></div>
-          <div id="pl-results"></div>
+        <div id="pl-pane-installed">
+          <div class="card">
+            <div class="card-header"><div class="card-title">@@ui.installed_plugins@@</div><span id="pl-ver" style="font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span></div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.enabling_disabling_and_deleting_need_a_serve@@</div>
+            <div id="pl-list"></div>
+          </div>
+        </div>
+        <div id="pl-pane-browse" style="display:none;">
+          <div class="card">
+            <div class="inp-row"><input class="inp" id="pl-q" placeholder="@@ui.search_modrinth@@" onkeydown="if(event.key==='Enter')searchPlugins()"><button class="btn btn-primary" style="flex:0 0 auto;" onclick="searchPlugins()">@@ui.search@@</button></div>
+            <div id="pl-results-title" style="font-size:12px;color:var(--muted);margin:12px 0 4px;"></div>
+            <div id="pl-results"></div>
+          </div>
         </div>
       </div>
 
@@ -1174,8 +1182,8 @@ function updateStats(m){
   if(m.ramUsed!=null&&m.ramMax!=null){var pct=Math.round(m.ramUsed/m.ramMax*100);document.getElementById('ram-used').textContent=m.ramUsed+' MB';document.getElementById('ram-max').textContent='/ '+m.ramMax+' MB';document.getElementById('ram-pct').textContent=pct+'%';var bar=document.getElementById('ram-bar');bar.style.width=pct+'%';bar.className='progress-bar'+(pct>85?' danger':pct>65?' warn':'');ramHistory.push(pct);ramHistory.shift();renderRamChart();}
   if(m.cpu!=null){var cpct=Math.round(m.cpu);document.getElementById('cpu-val').textContent=cpct+'%';var cbar=document.getElementById('cpu-bar');cbar.style.width=Math.min(cpct,100)+'%';cbar.className='progress-bar'+(cpct>85?' danger':cpct>65?' warn':'');if(m.cores!=null)document.getElementById('cpu-cores').textContent=m.cores+T('ui.cores');cpuHistory.push(cpct);cpuHistory.shift();renderCpuChart();}
 }
-function renderRamChart(){var chart=document.getElementById('ram-chart');if(!chart)return;var max=Math.max.apply(null,ramHistory.concat([1]));chart.innerHTML='';ramHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
-function renderCpuChart(){var chart=document.getElementById('cpu-chart');if(!chart)return;var max=Math.max.apply(null,cpuHistory.concat([1]));chart.innerHTML='';cpuHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
+function renderRamChart(){var chart=document.getElementById('ram-chart');if(!chart)return;var max=100;chart.innerHTML='';ramHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
+function renderCpuChart(){var chart=document.getElementById('cpu-chart');if(!chart)return;var max=100;chart.innerHTML='';cpuHistory.forEach(function(v){var bar=document.createElement('div');bar.className='chart-bar';bar.style.height=Math.max(2,Math.round(v/max*48))+'px';bar.style.opacity=String(0.3+(v/max*0.7));chart.appendChild(bar);});}
 async function apiPost(url,body){body=body||{};var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.error||r.statusText);}return r.json();}
 async function startServer(){try{await apiPost('/api/start');toast(T('ui.starting'));}catch(e){toast(e.message,'err');}}
 async function stopServer(){confirm2(T('ui.stop_server'),T('ui.the_server_will_stop_and_all_players_will_be'),async function(){try{await apiPost('/api/stop');toast(T('ui.stopping'),'warn');}catch(e){toast(e.message,'err');}});}
@@ -1836,11 +1844,13 @@ function renderPlugins(list){var box=document.getElementById('pl-list');box.text
     mk(p.enabled?T('ui.disable'):T('ui.enable'),function(){apiPost('/api/plugins/toggle',{file:p.file}).then(loadPlugins).catch(function(e){toast(e.message,'err');});});
     mk(T('ui.delete_3'),function(){confirm2(T('ui.delete_plugin'),p.file+T('ui.the_file_will_be_deleted_permanently_continu'),async function(){try{await apiPost('/api/plugins/delete',{file:p.file});loadPlugins();}catch(e){toast(e.message,'err');}});});
     box.appendChild(row);});}
-async function searchPlugins(){var q=document.getElementById('pl-q').value.trim(),box=document.getElementById('pl-results');if(!q)return;box.textContent='...';
+var plPopularLoaded=false;
+function plTab(w){document.getElementById('pl-pane-installed').style.display=w==='installed'?'':'none';document.getElementById('pl-pane-browse').style.display=w==='browse'?'':'none';document.getElementById('pl-tab-installed').classList.toggle('active',w==='installed');document.getElementById('pl-tab-browse').classList.toggle('active',w==='browse');if(w==='browse'&&!plPopularLoaded)searchPlugins();}
+async function searchPlugins(){var q=document.getElementById('pl-q').value.trim(),box=document.getElementById('pl-results');document.getElementById('pl-results-title').textContent=q?'':T('ui.pl_popular');if(!q)plPopularLoaded=true;box.textContent='...';
   try{var d=await fetch('/api/plugins/search?q='+encodeURIComponent(q)).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;});
     box.textContent='';if(!d.results.length){box.textContent=T('ui.no_results_2');return;}
     d.results.forEach(function(h){var row=document.createElement('div');row.className='backup-row';row.style.gap='8px';
-      var info=document.createElement('div');info.style.flex='1';var n=document.createElement('div');n.className='backup-name';n.textContent=h.title;var m=document.createElement('div');m.className='backup-meta';m.textContent=h.description+' · '+h.downloads+T('ui.downloads');info.appendChild(n);info.appendChild(m);row.appendChild(info);
+      if(h.icon){var ic=document.createElement('img');ic.src=h.icon;ic.loading='lazy';ic.alt='';ic.width=36;ic.height=36;ic.style.cssText='border-radius:6px;flex:0 0 auto;object-fit:cover;';row.appendChild(ic);}var info=document.createElement('div');info.style.flex='1';info.style.minWidth='0';var n=document.createElement('div');n.className='backup-name';n.textContent=h.title;var m=document.createElement('div');m.className='backup-meta';m.textContent=h.description+' · '+h.downloads+T('ui.downloads');info.appendChild(n);info.appendChild(m);row.appendChild(info);
       var x=document.createElement('button');x.className='btn btn-primary';x.style.cssText='padding:5px 12px;font-size:12px;';x.textContent=T('ui.install');
       x.onclick=async function(){x.disabled=true;x.textContent=T('ui.text_3');try{var r=await apiPost('/api/plugins/install',{id:h.id});toast(T('ui.installed')+r.file+T('ui.restart_the_server_to_load_it'));loadPlugins();x.textContent='✓';}catch(e){toast(e.message,'err');x.disabled=false;x.textContent=T('ui.install');}};
       row.appendChild(x);box.appendChild(row);});
