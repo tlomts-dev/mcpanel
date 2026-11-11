@@ -18,10 +18,10 @@ One codebase with two interface languages, Arabic (RTL) and English (LTR), drive
 - View the operators (ops), banned players and whitelist lists
 - Full file manager: browse, open and edit, upload, download, delete. Access is confined to the server folder
 - Backups: create (worlds + server.properties + ops/whitelist/bans), restore, delete, download. The archive is taken after `save-all flush` with autosave paused, so the world is consistent
-- **Multiple users with roles** (viewer / moderator / admin / owner) managed from Settings. The role is enforced on the server for every request and takes effect immediately when changed or when the user is deleted. Moderators get a limited command list (say, tp, kick, ban, gamemode...). The owner is the `.env` account and cannot be deleted. An **activity log** records sign-ins, commands, file, backup, settings and user changes, plus failed and denied attempts (never passwords or file contents). The WebSocket connection now requires a signed-in session as well
+- **Users with fine-grained permissions**: every feature in the panel is its own permission (about 34 in 9 sections: server, console, players, files, backups, scheduled tasks, plugins, settings, panel administration). You tick exactly what each user may do; the presets (viewer / moderator / administrator) are only a shortcut that fills the boxes, and you adjust afterwards. Enforced on the server for every request and effective immediately; console commands are checked one by one against their permission. A user who may manage users cannot grant what they do not hold. The owner is the `.env` account, holds everything and cannot be deleted. An **activity log** records sign-ins, commands, file, backup, settings and user changes, plus failed and denied attempts (never passwords or file contents). The WebSocket connection requires a signed-in session as well
 - **History charts** for TPS, memory, CPU, players and free disk over the last 24 hours (one point per minute, kept in `.panel-history.json`), drawn without any chart library
 - **Alerts** to Discord and Telegram: unexpected stop, start, low TPS, high memory, low disk, with a cooldown between repeats. The Discord URL is restricted to discord.com hosts and keys are never returned in full by the API
-- **Off-site backups** through rclone (S3, SFTP, Google Drive and more) for every manual or scheduled backup
+- **External backups** under Backups → External backups: **Backblaze B2**, Amazon S3 and compatibles (Wasabi, Cloudflare R2, MinIO, DigitalOcean), SFTP, FTP, WebDAV (Nextcloud), Google Drive, Dropbox, Azure Blob, or any rclone remote you already have. Add one or more destinations, test the connection with a button, then choose for each manual backup or scheduled task where it goes and whether a local copy stays, optionally keeping only the newest N backups at the destination. Needs rclone installed on the server. Your keys reach rclone through environment variables, never on the command line, and are never sent back to the browser
 - **Two-factor authentication (TOTP)** per account (Google Authenticator, Authy...), with replay protection, plus a `COOKIE_SECURE` option for deployments behind HTTPS
 - **Plugin manager**: list installed plugins (name and version read from `plugin.yml`), enable/disable/delete, and **search and install from Modrinth** with a version compatible with your server and hash verification before the file is kept
 - **Official Paper download** (any version) with checksum verification, and `eula=true` is written only if you explicitly accept
@@ -116,7 +116,7 @@ node -e "console.log(require('bcryptjs').hashSync('your-password-here', 12))"
 panel/
 ├── server.js          Express + WebSocket server with the whole API (Arabic edition)
 ├── lib/scheduler.js    Scheduler engine (shared by both editions)
-├── lib/auth.js         Users, roles and activity log (shared)
+├── lib/auth.js         Users, permissions and activity log
 ├── lib/monitor.js      History and alerts (shared)
 ├── lib/offsite.js      Off-site backups through rclone
 ├── lib/totp.js         TOTP two-factor (RFC 6238)

@@ -404,8 +404,6 @@ select.sel:focus{border-color:var(--accent2);}
   .card{padding:14px;}
   .log-area{height:320px;}
 }
-body.lvl-1 .need2,body.lvl-1 .need3,body.lvl-2 .need3,body:not(.lvl-4) .need4{display:none!important}
-body.lvl-1 [data-pa],body.lvl-1 [onclick^="playerQuickAction"],body.lvl-1 [onclick^="confirmDeletePlayerData"],body.lvl-2 [onclick^="confirmDeletePlayerData"]{display:none!important}
 .hist-h{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px;}
 .hist-h b{font-family:'IBM Plex Mono',monospace;color:var(--num-color);font-weight:600;}
 .hist-svg{width:100%;height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:block;}
@@ -413,6 +411,22 @@ body.lvl-1 [data-pa],body.lvl-1 [onclick^="playerQuickAction"],body.lvl-1 [oncli
 .al-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:center;margin:6px 0 14px;}
 .al-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;}
 .al-row .inp{max-width:110px;padding:5px 8px;}
+.perm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin:10px 0;}
+.perm-group{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;}
+.perm-gtitle{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:6px;}
+.perm-gtitle a{font-size:11px;font-weight:400;color:var(--muted);cursor:pointer;margin-inline-start:8px;}
+.perm-gtitle a:hover{color:var(--text);}
+.perm-item{display:flex;gap:7px;align-items:flex-start;font-size:12px;padding:3px 0;color:var(--text2);cursor:pointer;line-height:1.5;}
+.perm-item input{margin-top:3px;flex:0 0 auto;}
+.perm-item.off{opacity:.45;cursor:not-allowed;}
+.perm-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;}
+.dest-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--border);}
+.dest-row:last-child{border-bottom:none;}
+.dest-help{font-size:12px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:9px 12px;margin:8px 0;line-height:1.7;}
+.dest-form .field{margin-bottom:10px;}
+.dest-form label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.chip{display:inline-flex;gap:6px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 11px;font-size:12px;cursor:pointer;}
 /* ── LTR overrides (English and other left-to-right languages) ── */
 html[dir=ltr] .stat-card::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:var(--radius) 0 0 var(--radius);}
 html[dir=ltr] .stat-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:28px;opacity:.1;}
@@ -467,14 +481,15 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
 
   <nav class="nav-tabs">
     <div class="nav-tab active" onclick="showPage('overview')">@@ui.overview@@</div>
-    <div class="nav-tab" onclick="showPage('console')">@@ui.console@@</div>
-    <div class="nav-tab" onclick="showPage('players')">
+    <div class="nav-tab" data-perm="console.view" onclick="showPage('console')">@@ui.console@@</div>
+    <div class="nav-tab" data-perm="players.view" onclick="showPage('players')">
       @@ui.players@@
       <span class="tab-badge" id="players-badge">0</span>
     </div>
-    <div class="nav-tab need3" onclick="showPage('files')">@@ui.files@@</div>
-    <div class="nav-tab need3" onclick="showPage('backups')">@@ui.backups_2@@</div>
-    <div class="nav-tab need3" onclick="showPage('settings')">@@ui.settings@@</div>
+    <div class="nav-tab" data-perm="files.view" onclick="showPage('files')">@@ui.files@@</div>
+    <div class="nav-tab" data-perm="backups.view" onclick="showPage('backups')">@@ui.backups_2@@</div>
+    <div class="nav-tab" data-perm="schedule.view" onclick="showPage('schedule')">@@ui.nav_schedule@@</div>
+    <div class="nav-tab" id="nav-settings" onclick="showPage('settings')">@@ui.settings@@</div>
     <div class="nav-tab" onclick="showPage('account')">@@ui.account@@</div>
   </nav>
 
@@ -548,7 +563,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
       </div>
 
       <div class="grid2">
-        <div class="card need3">
+        <div class="card">
           <div class="card-title" style="margin-bottom:14px;">@@ui.server_control@@</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <button class="btn btn-primary btn-full" id="bstart" onclick="startServer()">@@ui.start@@</button>
@@ -634,11 +649,11 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <div class="log-area" id="log"></div>
           <button class="scroll-to-bottom" id="scroll-btn" onclick="jumpToBottom()">@@ui.jump_to_bottom@@</button>
         </div>
-        <div class="cmd-row need2">
+        <div class="cmd-row" id="cmd-row">
           <input type="text" id="cmdinput" placeholder="Server command... (↑↓ history)" maxlength="256" onkeydown="handleCmdKey(event)">
           <button id="cmdBtn" onclick="sendCmd()">@@ui.send@@</button>
         </div>
-        <div class="cmd-hints need2">
+        <div class="cmd-hints" id="cmd-hints">
           <span class="cmd-hint" onclick="fillCmd('say ')">say</span>
           <span class="cmd-hint" onclick="fillCmd('give ')">give</span>
           <span class="cmd-hint" onclick="fillCmd('tp ')">tp</span>
@@ -822,6 +837,11 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
     </div>
 
     <div class="page" id="page-backups">
+      <div class="sub-tabs">
+        <div class="sub-tab active" data-sub="local" onclick="showSubTab('backups','local');loadBackups()">@@ui.bk_local@@</div>
+        <div class="sub-tab" data-sub="external" data-perm="backups.offsite" onclick="showSubTab('backups','external');loadDestinations()">@@ui.bk_external@@</div>
+      </div>
+      <div class="sub-page active" id="backups-local">
       <div class="card">
         <div class="card-header">
           <div class="card-title">@@ui.backups_3@@</div>
@@ -830,18 +850,25 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
             <button class="btn btn-primary" onclick="createBackup()">@@ui.create_backup@@</button>
           </div>
         </div>
+        <div id="bk-create-opts" class="chip-row" style="margin:-4px 0 12px;"></div>
         <div id="backup-list"></div>
       </div>
-      <div class="card">
-        <div class="card-title" style="margin-bottom:6px;">@@ui.off_site_copy_rclone@@</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.copies_every_new_backup_manual_and_scheduled@@</div>
-        <div class="inp-row" style="align-items:center;">
-          <label style="font-size:13px;white-space:nowrap;"><input type="checkbox" id="off-on"> @@ui.enable_off_site_copies@@</label>
-          <input class="inp" id="off-remote" dir="ltr" placeholder="myremote:minecraft-backups" autocomplete="off">
-          <button class="btn btn-primary" onclick="saveOffsite()">@@ui.save_2@@</button>
-          <button class="btn btn-ghost" onclick="testOffsite()">@@ui.test_connection@@</button>
-        </div>
       </div>
+      <div class="sub-page" id="backups-external">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">@@ui.ext_title@@</div>
+            <button class="btn btn-primary" onclick="destEdit(null)">@@ui.ext_add@@</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.7;">@@ui.ext_intro@@</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">@@ui.ext_need_rclone@@</div>
+          <div id="dest-list"></div>
+        </div>
+        <div class="card dest-form" id="dest-form" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="page" id="page-schedule">
       <div class="card">
         <div class="card-header">
           <div class="card-title">@@ui.scheduled_tasks@@</div>
@@ -861,6 +888,11 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <input class="inp" id="sch-arg" maxlength="200" style="display:none;">
           <input class="inp" id="sch-num" type="number" min="0" max="1000" value="7" style="max-width:240px;">
           <button class="btn btn-primary" onclick="addSchedule()">@@ui.add_task@@</button>
+        </div>
+        <div id="sch-backup-opts" style="margin-top:10px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">@@ui.sch_dests_hint@@</div>
+          <div class="chip-row" id="sch-dests"></div>
+          <label class="chip" style="margin-top:8px;"><input type="checkbox" id="sch-keeplocal" checked> @@ui.sch_keep_local@@</label>
         </div>
       </div>
     </div>
@@ -891,14 +923,14 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
 
     <div class="page" id="page-settings">
       <div class="sub-tabs">
-        <div class="sub-tab active" data-sub="properties" onclick="showSubTab('settings','properties');loadProps()">⚙️ server.properties</div>
-        <div class="sub-tab" data-sub="startup" onclick="showSubTab('settings','startup');loadStartupSettings()">🚀 JVM</div>
+        <div class="sub-tab active" data-sub="properties" data-perm="settings.view" onclick="showSubTab('settings','properties');loadProps()">⚙️ server.properties</div>
+        <div class="sub-tab" data-sub="startup" data-perm="settings.view" onclick="showSubTab('settings','startup');loadStartupSettings()">🚀 JVM</div>
         <div class="sub-tab" data-sub="panel" onclick="showSubTab('settings','panel')">@@ui.panel@@</div>
-        <div class="sub-tab" data-sub="alerts" onclick="showSubTab('settings','alerts');loadAlerts()">@@ui.alerts@@</div>
-        <div class="sub-tab" data-sub="plugins" onclick="showSubTab('settings','plugins');loadPlugins()">@@ui.plugins@@</div>
-        <div class="sub-tab" data-sub="jar" onclick="showSubTab('settings','jar');loadJarVersions()">@@ui.server_jar@@</div>
-        <div class="sub-tab need4" data-sub="users" onclick="showSubTab('settings','users');loadUsers()">@@ui.users@@</div>
-        <div class="sub-tab need4" data-sub="audit" onclick="showSubTab('settings','audit');loadAudit()">@@ui.activity_log@@</div>
+        <div class="sub-tab" data-sub="alerts" data-perm="settings.alerts" onclick="showSubTab('settings','alerts');loadAlerts()">@@ui.alerts@@</div>
+        <div class="sub-tab" data-sub="plugins" data-perm="plugins.view" onclick="showSubTab('settings','plugins');loadPlugins()">@@ui.plugins@@</div>
+        <div class="sub-tab" data-sub="jar" data-perm="plugins.jar" onclick="showSubTab('settings','jar');loadJarVersions()">@@ui.server_jar@@</div>
+        <div class="sub-tab" data-sub="users" data-perm="admin.users" onclick="showSubTab('settings','users');loadUsers()">@@ui.users@@</div>
+        <div class="sub-tab" data-sub="audit" data-perm="admin.audit" onclick="showSubTab('settings','audit');loadAudit()">@@ui.activity_log@@</div>
       </div>
 
       <div class="sub-page active" id="settings-properties">
@@ -948,12 +980,13 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <div class="card-title" style="margin-bottom:6px;">@@ui.users_and_permissions@@</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.viewer_read_only_moderator_basic_game_comman@@</div>
           <div id="users-list"></div>
-          <div class="inp-row" style="margin-top:14px;">
+          <div class="card-title" style="margin:18px 0 8px;font-size:13px;">@@ui.add_2@@</div>
+          <div class="inp-row">
             <input class="inp" id="nu-name" maxlength="32" placeholder="@@ui.username@@" autocomplete="off" style="max-width:180px;">
             <input class="inp" id="nu-pass" type="password" placeholder="@@ui.password_at_least_8_characters@@" autocomplete="new-password">
-            <select class="inp" id="nu-role" style="max-width:140px;"><option value="viewer">@@ui.viewer@@</option><option value="mod">@@ui.moderator@@</option><option value="admin">@@ui.admin@@</option></select>
-            <button class="btn btn-primary" onclick="addUser()">@@ui.add_2@@</button>
           </div>
+          <div id="nu-perms"></div>
+          <button class="btn btn-primary" onclick="addUser()">@@ui.add_2@@</button>
         </div>
       </div>
 
@@ -1608,30 +1641,94 @@ async function handleFileUpload(ev){var files=ev.target.files;if(!files||!files.
 // ════════════ BACKUPS ════════════
 async function loadBackups(){try{var d=await fetch('/api/backups').then(function(r){return r.json();});backups=d.backups||[];renderBackups();}catch(e){}}
 function renderBackups(){var list=document.getElementById('backup-list');if(!backups.length){list.innerHTML=T('ui.no_backups_yet');return;}list.innerHTML='';backups.forEach(function(b){var row=document.createElement('div');row.className='backup-row';row.innerHTML='<div><div class="backup-name">📦 '+esc(b.name)+'</div><div class="backup-meta">'+esc(b.date)+' — '+fmtBytes(b.size)+'</div></div><div class="backup-actions"><a class="btn btn-ghost" style="padding:5px 10px;font-size:12px;text-decoration:none;" href="/api/backups/download?name='+encodeURIComponent(b.name)+T('ui.download_download_button_class_btn_btn_warn')+esc(b.name)+T('ui.restore_button_class_btn_btn_danger_style_pa')+esc(b.name)+'">🗑</button></div>';list.appendChild(row);});}
-async function createBackup(){var btns=Array.prototype.slice.call(document.querySelectorAll('[onclick="createBackup()"]'));btns.forEach(function(b){b.disabled=true;b.textContent=T('ui.working');});try{var d=await apiPost('/api/backups/create');toast(T('ui.backup_created')+d.name);loadBackups();}catch(e){toast(e.message,'err');}finally{btns.forEach(function(b){b.disabled=false;b.textContent=T('ui.create_backup');});}}
+async function createBackup(){var btns=Array.prototype.slice.call(document.querySelectorAll('[onclick="createBackup()"]'));btns.forEach(function(b){b.disabled=true;b.textContent=T('ui.working');});
+  var body={dests:checkedDests('bk-create-opts'),keepLocal:document.getElementById('bk-keeplocal')?document.getElementById('bk-keeplocal').checked:true};
+  try{var d=await apiPost('/api/backups/create',body);toast(T('ui.backup_created')+d.name+(d.failed?T('ui.bk_upload_failed',{v0:d.failed}):(d.uploaded?T('ui.bk_uploaded'):'')),d.failed?'warn':'');loadBackups();}catch(e){toast(e.message,'err');}finally{btns.forEach(function(b){b.disabled=false;b.textContent=T('ui.create_backup');});}}
 function restoreBackup(name){confirm2(T('ui.restore_backup'),T('ui.the_server_will_stop_and_this_will_be_restor')+name+T('ui.this_cannot_be_undone_2'),async function(){try{await apiPost('/api/backups/restore',{name:name});toast(T('ui.restoring'),'warn');}catch(e){toast(e.message,'err');}});}
 function deleteBackup(name){confirm2(T('ui.delete_backup'),T('ui.delete_2')+name+T('ui.text_2'),async function(){try{await apiPost('/api/backups/delete',{name:name});toast(T('ui.deleted_3'));loadBackups();}catch(e){toast(e.message,'err');}});}
 
 
-// ════════════ OFF-SITE BACKUP ════════════
-async function loadOffsite(){try{var c=await fetch('/api/backups/offsite').then(function(r){return r.json();});document.getElementById('off-on').checked=!!c.enabled;document.getElementById('off-remote').value=c.remote||'';}catch(e){}}
-async function saveOffsite(){try{await apiPost('/api/backups/offsite',{enabled:document.getElementById('off-on').checked,remote:document.getElementById('off-remote').value});toast(T('ui.saved_2'));loadOffsite();}catch(e){toast(e.message,'err');}}
-async function testOffsite(){try{await saveOffsite();await apiPost('/api/backups/offsite/test');toast(T('ui.connection_works'));}catch(e){toast(e.message,'err');}}
+// ════════════ EXTERNAL BACKUP DESTINATIONS ════════════
+var destCache=[],destEnums={};
+var EXT_TYPES={
+  b2:{name:'ui.ext_type_b2',help:'ui.ext_help_b2',path:'ui.ext_path_bucket',fields:[['account','ui.ext_f_keyid',''],['key','ui.ext_f_appkey','s']]},
+  s3:{name:'ui.ext_type_s3',help:'ui.ext_help_s3',path:'ui.ext_path_bucket',fields:[['provider','ui.ext_f_provider','e'],['access_key_id','ui.ext_f_access_key_id',''],['secret_access_key','ui.ext_f_secret_access_key','s'],['region','ui.ext_f_region',''],['endpoint','ui.ext_f_endpoint','']]},
+  sftp:{name:'ui.ext_type_sftp',help:'ui.ext_help_sftp',path:'ui.ext_path_folder',fields:[['host','ui.ext_f_host',''],['port','ui.ext_f_port',''],['user','ui.ext_f_user',''],['pass','ui.ext_f_pass','s']]},
+  ftp:{name:'ui.ext_type_ftp',help:'ui.ext_help_ftp',path:'ui.ext_path_folder',fields:[['host','ui.ext_f_host',''],['port','ui.ext_f_port',''],['user','ui.ext_f_user',''],['pass','ui.ext_f_pass','s']]},
+  webdav:{name:'ui.ext_type_webdav',help:'ui.ext_help_webdav',path:'ui.ext_path_folder',fields:[['url','ui.ext_f_url',''],['vendor','ui.ext_f_vendor','e'],['user','ui.ext_f_user',''],['pass','ui.ext_f_pass','s']]},
+  drive:{name:'ui.ext_type_drive',help:'ui.ext_help_drive',path:'ui.ext_path_folder',fields:[['token','ui.ext_f_token','s']]},
+  dropbox:{name:'ui.ext_type_dropbox',help:'ui.ext_help_dropbox',path:'ui.ext_path_folder',fields:[['token','ui.ext_f_token','s']]},
+  azureblob:{name:'ui.ext_type_azureblob',help:'ui.ext_help_azureblob',path:'ui.ext_path_container',fields:[['account','ui.ext_f_az_account',''],['key','ui.ext_f_az_key','s']]},
+  remote:{name:'ui.ext_type_remote',help:'ui.ext_help_remote',path:'ui.ext_path_remote',fields:[]}
+};
+async function loadDestinations(){try{var d=await fetch('/api/backups/destinations').then(function(r){return r.json();});destCache=d.destinations||[];destEnums=d.enums||{};renderDestinations();renderCreateOpts();renderSchDests();}catch(e){}}
+function destById(id){for(var i=0;i<destCache.length;i++)if(destCache[i].id===id)return destCache[i];return null;}
+function renderDestinations(){var box=document.getElementById('dest-list');if(!box)return;box.textContent='';
+  if(!destCache.length){var e=document.createElement('div');e.style.cssText='text-align:center;color:var(--muted);padding:18px;font-size:13px;';e.textContent=T('ui.ext_none');box.appendChild(e);return;}
+  destCache.forEach(function(d){var row=document.createElement('div');row.className='dest-row';
+    var info=document.createElement('div');info.style.flex='1';info.style.minWidth='200px';
+    var n=document.createElement('div');n.className='backup-name';n.textContent=d.name;
+    if(d.auto){var b=document.createElement('span');b.className='badge badge-on';b.style.margin='0 6px';b.textContent=T('ui.ext_badge_auto');n.appendChild(b);}
+    if(!d.enabled){var b2=document.createElement('span');b2.className='badge badge-off';b2.style.margin='0 6px';b2.textContent=T('ui.ext_badge_off');n.appendChild(b2);}
+    var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';m.textContent=(EXT_TYPES[d.type]?T(EXT_TYPES[d.type].name):d.type)+(d.path?' · '+d.path:'')+(d.keepRemote?' · '+T('ui.ext_keeps',{v0:d.keepRemote}):'');
+    info.appendChild(n);info.appendChild(m);row.appendChild(info);
+    function mk(txt,fn){var x=document.createElement('button');x.className='btn btn-ghost';x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=txt;x.onclick=function(){fn(x);};row.appendChild(x);}
+    mk(T('ui.test_connection'),function(x){x.disabled=true;var o=x.textContent;x.textContent='...';apiPost('/api/backups/destinations/test',{id:d.id}).then(function(){toast(T('ui.ext_test_ok'));}).catch(function(e){toast(e.message,'err');}).then(function(){x.disabled=false;x.textContent=o;});});
+    mk(T('ui.edit'),function(){destEdit(d.id);});
+    mk(T('ui.delete_3'),function(){confirm2(T('ui.ext_delete_title'),d.name+T('ui.ext_delete_body'),async function(){try{await apiPost('/api/backups/destinations/delete',{id:d.id});toast(T('ui.ext_deleted'));loadDestinations();}catch(e){toast(e.message,'err');}});});
+    box.appendChild(row);});}
+function destEdit(id){var f=document.getElementById('dest-form'),d=id?destById(id):null;f.style.display='';
+  var types=Object.keys(EXT_TYPES),cur=d?d.type:'b2';
+  f.innerHTML='<div class="card-title" style="margin-bottom:12px;">'+esc(d?T('ui.ext_edit'):T('ui.ext_add'))+'</div>'
+    +'<div class="field"><label class="lbl">'+esc(T('ui.ext_type'))+'</label><select class="inp" id="df-type"'+(d?' disabled':'')+'>'+types.map(function(k){return '<option value="'+k+'"'+(k===cur?' selected':'')+'>'+esc(T(EXT_TYPES[k].name))+'</option>';}).join('')+'</select></div>'
+    +'<div class="dest-help" id="df-help"></div>'
+    +'<div class="field"><label class="lbl">'+esc(T('ui.ext_name'))+'</label><input class="inp" id="df-name" maxlength="40" value="'+esc(d?d.name:'')+'"></div>'
+    +'<div id="df-fields"></div>'
+    +'<div class="field"><label class="lbl" id="df-path-lbl"></label><input class="inp" id="df-path" dir="ltr" maxlength="200" value="'+esc(d?d.path:'')+'"></div>'
+    +'<div class="field"><label class="lbl">'+esc(T('ui.ext_keep_remote'))+'</label><input class="inp" id="df-keep" type="number" min="0" max="1000" value="'+(d?d.keepRemote:0)+'" style="max-width:140px;"></div>'
+    +'<div class="chip-row" style="margin-bottom:12px;"><label class="chip"><input type="checkbox" id="df-auto"'+((d?d.auto:true)?' checked':'')+'> '+esc(T('ui.ext_auto'))+'</label><label class="chip"><input type="checkbox" id="df-on"'+((d?d.enabled:true)?' checked':'')+'> '+esc(T('ui.ext_enabled'))+'</label></div>'
+    +'<div style="display:flex;gap:8px;"><button class="btn btn-primary" id="df-save">'+esc(T('ui.save_2'))+'</button><button class="btn btn-ghost" id="df-cancel">'+esc(T('ui.cancel'))+'</button></div>';
+  function fields(){var t=document.getElementById('df-type').value,def=EXT_TYPES[t],box=document.getElementById('df-fields');
+    document.getElementById('df-help').textContent=T(def.help);document.getElementById('df-path-lbl').textContent=T(def.path);
+    document.getElementById('df-path').placeholder=t==='remote'?'myremote:minecraft':'';
+    box.innerHTML=def.fields.map(function(fd){var k=fd[0],fl=fd[2],val=(d&&d.type===t&&d.params&&d.params[k]!==undefined)?d.params[k]:'',has=d&&d.type===t&&d.hasSecret&&d.hasSecret[k];
+      var inp;
+      if(fl==='e'){inp='<select class="inp" data-f="'+k+'">'+(destEnums[k]||[]).map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>';}
+      else if(fl==='s'){inp='<input class="inp" data-f="'+k+'" type="password" autocomplete="new-password" dir="ltr" placeholder="'+esc(has?T('ui.ext_saved_secret'):'')+'">';}
+      else{inp='<input class="inp" data-f="'+k+'" dir="ltr" value="'+esc(val)+'">';}
+      return '<div class="field"><label class="lbl">'+esc(T(fd[1]))+'</label>'+inp+'</div>';}).join('');}
+  document.getElementById('df-type').onchange=fields;fields();
+  document.getElementById('df-cancel').onclick=function(){f.style.display='none';};
+  document.getElementById('df-save').onclick=async function(){var params={};document.querySelectorAll('#df-fields [data-f]').forEach(function(el){params[el.getAttribute('data-f')]=el.value;});
+    try{await apiPost('/api/backups/destinations',{id:d?d.id:undefined,type:document.getElementById('df-type').value,name:document.getElementById('df-name').value,path:document.getElementById('df-path').value,keepRemote:document.getElementById('df-keep').value,auto:document.getElementById('df-auto').checked,enabled:document.getElementById('df-on').checked,params:params});
+      toast(T('ui.ext_saved'));f.style.display='none';loadDestinations();}catch(e){toast(e.message,'err');}};
+  f.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function chipsHtml(prefix,onlyEnabled){return destCache.filter(function(d){return d.enabled;}).map(function(d){return '<label class="chip"><input type="checkbox" data-did="'+esc(d.id)+'"'+(d.auto?' checked':'')+'> '+esc(d.name)+'</label>';}).join('');}
+function checkedDests(boxId){var box=document.getElementById(boxId);if(!box)return [];return Array.prototype.map.call(box.querySelectorAll('input[data-did]:checked'),function(i){return i.getAttribute('data-did');});}
+function renderCreateOpts(){var box=document.getElementById('bk-create-opts');if(!box)return;var on=destCache.filter(function(d){return d.enabled;});
+  if(!on.length){box.innerHTML='';return;}
+  box.innerHTML='<span style="font-size:12px;color:var(--muted);">'+esc(T('ui.bk_send_to'))+'</span>'+chipsHtml()+'<label class="chip"><input type="checkbox" id="bk-keeplocal" checked> '+esc(T('ui.bk_keep_local'))+'</label>';}
+function renderSchDests(){var box=document.getElementById('sch-dests');if(!box)return;var on=destCache.filter(function(d){return d.enabled;});
+  box.innerHTML=on.length?chipsHtml():'<span style="font-size:12px;color:var(--muted);">'+esc(T('ui.bk_no_dests'))+'</span>';}
 
 // ════════════ SCHEDULER ════════════
 var SCH_LABEL={backup:T('ui.backup'),restart:T('ui.restart_2'),command:T('ui.command'),broadcast:T('ui.broadcast')};
 function schTypeChanged(){var t=document.getElementById('sch-type').value,arg=document.getElementById('sch-arg'),num=document.getElementById('sch-num');
-  arg.style.display=(t==='command'||t==='broadcast')?'':'none';arg.placeholder=t==='command'?T('ui.command_e_g_save_all'):T('ui.message_text');
-  num.style.display=(t==='backup'||t==='restart')?'':'none';num.placeholder=t==='backup'?T('ui.backups_to_keep_0_all'):T('ui.warning_seconds_before_restart');num.title=num.placeholder;num.value=t==='backup'?7:60;}
+  arg.style.display=(t==='command'||t==='broadcast')?'':'none';arg.placeholder=t==='command'?T('ui.sch_cmd_ph'):T('ui.sch_msg_ph');
+  num.style.display=(t==='backup'||t==='restart')?'':'none';num.placeholder=t==='backup'?T('ui.sch_keep_ph'):T('ui.sch_warn_ph');num.title=num.placeholder;num.value=t==='backup'?7:60;
+  var o=document.getElementById('sch-backup-opts');if(o)o.style.display=t==='backup'?'':'none';}
 function schPresetChanged(){var v=document.getElementById('sch-preset').value;if(v)document.getElementById('sch-cron').value=v;}
 async function loadSchedule(){try{var d=await fetch('/api/schedule').then(function(r){return r.json();});renderSchedule(d.tasks||[]);}catch(e){}}
+function schDestText(t){var ids=Array.isArray(t.dests)?t.dests:destCache.filter(function(d){return d.enabled&&d.auto;}).map(function(d){return d.id;});
+  var names=ids.map(function(i){var d=destById(i);return d?d.name:null;}).filter(Boolean);
+  return ' · '+(names.length?T('ui.sch_sends_to',{v0:names.join(', ')})+(t.keepLocal===false?T('ui.sch_no_local'):''):T('ui.sch_local_only_label'));}
 function renderSchedule(tasks){var list=document.getElementById('sch-list');if(!list)return;list.textContent='';
   if(!tasks.length){var e=document.createElement('div');e.style.cssText='text-align:center;color:var(--muted);padding:18px;font-size:13px;';e.textContent=T('ui.no_scheduled_tasks_yet');list.appendChild(e);return;}
   tasks.forEach(function(t){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';
     var info=document.createElement('div');info.style.cssText='flex:1;min-width:200px;';
     var n=document.createElement('div');n.className='backup-name';n.textContent=t.name;
     var b=document.createElement('span');b.className='badge '+(t.enabled?'badge-on':'badge-off');b.style.margin='0 6px';b.textContent=t.enabled?T('ui.enabled_2'):T('ui.paused');n.appendChild(b);
-    var extra=t.type==='backup'?(t.keep?T('ui.keeps_last')+t.keep+T('ui.backups'):''):t.type==='restart'?T('ui.warns')+t.warn+T('ui.s'):' · '+t.arg;
+    var extra=t.type==='backup'?(t.keep?T('ui.keeps_last')+t.keep+T('ui.backups'):'')+schDestText(t):t.type==='restart'?T('ui.warns')+t.warn+T('ui.s'):' · '+t.arg;
     var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';
     m.textContent=SCH_LABEL[t.type]+' · '+t.cron+extra+T('ui.last_run')+(t.lastRun?new Date(t.lastRun).toLocaleString()+' ('+t.lastStatus+')':T('ui.never_ran'));
     info.appendChild(n);info.appendChild(m);row.appendChild(info);
@@ -1643,6 +1740,7 @@ function renderSchedule(tasks){var list=document.getElementById('sch-list');if(!
     row.appendChild(acts);list.appendChild(row);});}
 async function addSchedule(){var t=document.getElementById('sch-type').value,body={type:t,name:document.getElementById('sch-name').value,cron:document.getElementById('sch-cron').value};
   if(t==='backup')body.keep=document.getElementById('sch-num').value;else if(t==='restart')body.warn=document.getElementById('sch-num').value;else body.arg=document.getElementById('sch-arg').value;
+  if(t==='backup'){body.dests=checkedDests('sch-dests');body.keepLocal=document.getElementById('sch-keeplocal').checked;}
   try{await apiPost('/api/schedule',body);toast(T('ui.task_added'));document.getElementById('sch-name').value='';document.getElementById('sch-arg').value='';loadSchedule();}catch(e){toast(e.message,'err');}}
 async function schToggle(id,en){try{await apiPost('/api/schedule/update',{id:id,enabled:en});loadSchedule();}catch(e){toast(e.message,'err');}}
 async function schRun(id){try{var d=await apiPost('/api/schedule/run',{id:id});toast(T('ui.executed')+d.status);loadSchedule();}catch(e){toast(e.message,'err');}}
@@ -1788,31 +1886,84 @@ function applyPanelSettings(){var e=document.getElementById('pref-maxlog');MAX_L
 function toggleAutoList(){var on=document.getElementById('pref-autolist').checked;if(on&&running&&!listInterval)listInterval=setInterval(function(){if(running&&wsConnected)cmd('list');},30000);else if(!on){clearInterval(listInterval);listInterval=null;}}
 
 // ════════════ USERS, ROLES, AUDIT ════════════
-var myLevel=1,myRole='viewer',myName='',ROLE_LABEL={viewer:T('ui.viewer'),mod:T('ui.moderator'),admin:T('ui.admin'),owner:T('ui.owner')};
+var myPerms=[],myConsole=false,PERM_META=null,myRole='viewer',myName='',myTfa=false,ROLE_LABEL={viewer:T('ui.viewer'),mod:T('ui.moderator'),admin:T('ui.admin'),owner:T('ui.owner'),custom:T('ui.role_custom')};
+function can(p){return myPerms.indexOf(p)>=0;}
+// Elements built by the page itself that belong to a permission (static ones carry data-perm in the HTML).
+var PERM_SEL={
+  'server.start':['#bstart'],'server.stop':['#bstop'],'server.restart':['#brestart'],
+  'players.op':['[onclick^="pa(\'op\')"]','[onclick^="pa(\'deop\')"]','[onclick^="opAction("]','[data-pa="op"]','[data-pa="deop"]'],
+  'players.kick':['[onclick^="pa(\'kick\')"]','[data-pa="kick"]'],
+  'players.ban':['[onclick^="pa(\'ban\')"]','[onclick^="banAction("]','[onclick^="unbanAction("]','[data-pa="ban"]','[data-pa="unban"]'],
+  'players.whitelist':['[onclick^="wlAction("]','[data-wlrm]'],
+  'players.manage':['[onclick^="playerQuickAction("]'],
+  'players.data':['[onclick^="confirmDeletePlayerData("]'],
+  'files.edit':['[onclick*="file-upload-input"]','[onclick^="saveFile("]','[data-fmenu="rename"]'],
+  'files.delete':['[data-fmenu="delete"]'],
+  'backups.create':['[onclick="createBackup()"]','#bk-create-opts'],
+  'backups.restore':['[data-bkr]'],'backups.delete':['[data-bkd]'],'backups.download':['a[href^="/api/backups/download"]']
+};
 async function applyRole(){
-  try{var me=await fetch('/api/me').then(function(r){return r.json();});myLevel=me.level||1;myRole=me.role;myName=me.username;myTfa=!!me.twoFa;}catch(e){myLevel=1;}
-  for(var i=1;i<=4;i++)document.body.classList.remove('lvl-'+i);document.body.classList.add('lvl-'+myLevel);
+  try{var me=await fetch('/api/me').then(function(r){return r.json();});myPerms=me.perms||[];myConsole=!!me.console;myRole=me.role;myName=me.username;myTfa=!!me.twoFa;}catch(e){myPerms=[];}
+  try{PERM_META=await fetch('/api/perms').then(function(r){return r.json();});}catch(e){PERM_META={groups:{},presets:{},commands:{}};}
+  var css=[],all=can('console.command');
+  Object.keys(PERM_META.groups).forEach(function(g){PERM_META.groups[g].forEach(function(a){var p=g+'.'+a;if(can(p))return;css.push('[data-perm="'+p+'"]');(PERM_SEL[p]||[]).forEach(function(x){css.push(x);});});});
+  var cm=PERM_META.commands||{};
+  Object.keys(cm).forEach(function(w){if(all||can(cm[w]))return;css.push('[onclick^="cmd(\''+w+'"]','[onclick^="fillCmd(\''+w+'"]');});
+  var st=document.getElementById('perm-style');if(!st){st=document.createElement('style');st.id='perm-style';document.head.appendChild(st);}
+  st.textContent=css.length?css.join(',')+'{display:none!important}':'';
+  document.querySelectorAll('.cmd-hint').forEach(function(h){var m=/fillCmd\('([\w-]+)/.exec(h.getAttribute('onclick')||''),w=m&&m[1];h.style.display=(all||(w&&cm[w]&&can(cm[w])))?'':'none';});
+  ['cmd-row','cmd-hints'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=myConsole?'':'none';});
   document.getElementById('whoami').textContent=myName+' · '+(ROLE_LABEL[myRole]||'');
+  requestAnimationFrame(function(){var act=document.querySelector('#page-settings .sub-tab.active');if(act&&getComputedStyle(act).display==='none'){var tabs=document.querySelectorAll('#page-settings .sub-tab');for(var i=0;i<tabs.length;i++){if(getComputedStyle(tabs[i]).display!=='none'){tabs[i].click();break;}}}});
 }
 function renderAccount(){renderTfa();document.getElementById('acct-name').textContent=myName;document.getElementById('acct-role').textContent=ROLE_LABEL[myRole]||'';}
 async function changeMyPassword(){var c=document.getElementById('acct-cur'),n=document.getElementById('acct-new');
   try{await apiPost('/api/me/password',{current:c.value,newPassword:n.value});c.value='';n.value='';toast(T('ui.password_changed'));}catch(e){toast(e.message,'err');}}
-async function loadUsers(){try{var d=await fetch('/api/users').then(function(r){return r.json();});renderUsers(d.users||[]);}catch(e){}}
+var nuEditor=null;
+function permLabel(p){return T('ui.perm_'+p.replace('.','_'));}
+// Permission checkboxes grouped by section, with a preset selector that only fills the boxes in.
+function permEditor(host,initial){host.textContent='';
+  var bar=document.createElement('div');bar.className='perm-bar';
+  var lab=document.createElement('span');lab.style.cssText='font-size:12px;color:var(--muted);';lab.textContent=T('ui.perm_preset');
+  var sel=document.createElement('select');sel.className='inp';sel.style.cssText='max-width:180px;padding:5px 8px;';
+  ['viewer','mod','admin','custom'].forEach(function(r){var o=document.createElement('option');o.value=r;o.textContent=ROLE_LABEL[r];sel.appendChild(o);});
+  var hint=document.createElement('span');hint.style.cssText='font-size:11px;color:var(--muted);';hint.textContent=T('ui.perm_preset_hint');
+  bar.appendChild(lab);bar.appendChild(sel);bar.appendChild(hint);host.appendChild(bar);
+  var grid=document.createElement('div');grid.className='perm-grid';host.appendChild(grid);
+  var boxes={};
+  Object.keys(PERM_META.groups).forEach(function(g){var box=document.createElement('div');box.className='perm-group';
+    var title=document.createElement('div');title.className='perm-gtitle';var tt=document.createElement('span');tt.textContent=T('ui.pgroup_'+g);title.appendChild(tt);
+    var links=document.createElement('span');
+    function link(txt,val){var a=document.createElement('a');a.textContent=txt;a.onclick=function(){PERM_META.groups[g].forEach(function(x){var b=boxes[g+'.'+x];if(!b.disabled)b.checked=val;});sync();};links.appendChild(a);}
+    link(T('ui.perm_all'),true);link(T('ui.perm_none'),false);title.appendChild(links);box.appendChild(title);
+    PERM_META.groups[g].forEach(function(a){var p=g+'.'+a,row=document.createElement('label');row.className='perm-item';
+      var cb=document.createElement('input');cb.type='checkbox';cb.onchange=sync;
+      if(myRole!=='owner'&&!can(p)){cb.disabled=true;row.className+=' off';}
+      boxes[p]=cb;cb.onchange=function(){var im=(PERM_META.implies||{})[p];if(cb.checked&&im&&boxes[im]&&!boxes[im].disabled)boxes[im].checked=true;if(!cb.checked)Object.keys(boxes).forEach(function(q){if((PERM_META.implies||{})[q]===p&&!boxes[q].disabled)boxes[q].checked=false;});sync();};var sp=document.createElement('span');sp.textContent=permLabel(p);row.appendChild(cb);row.appendChild(sp);box.appendChild(row);});
+    grid.appendChild(box);});
+  function get(){return Object.keys(boxes).filter(function(p){return boxes[p].checked;});}
+  function set(list){Object.keys(boxes).forEach(function(p){boxes[p].checked=list.indexOf(p)>=0&&!boxes[p].disabled;});sync();}
+  function sync(){var cur=get().sort().join(',');sel.value='custom';['viewer','mod','admin'].forEach(function(r){if((PERM_META.presets[r]||[]).slice().sort().join(',')===cur)sel.value=r;});}
+  sel.onchange=function(){if(sel.value!=='custom')set(PERM_META.presets[sel.value]||[]);};
+  set(initial);return {get:get,set:set};}
+async function loadUsers(){try{var d=await fetch('/api/users').then(function(r){return r.json();});renderUsers(d.users||[]);if(!nuEditor&&PERM_META)nuEditor=permEditor(document.getElementById('nu-perms'),PERM_META.presets.viewer||[]);}catch(e){}}
 function renderUsers(users){var list=document.getElementById('users-list');list.textContent='';
-  users.forEach(function(u){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';row.style.gap='8px';
+  users.forEach(function(u){var wrap=document.createElement('div');wrap.style.cssText='border-bottom:1px solid var(--border);padding:8px 0;';
+    var row=document.createElement('div');row.className='backup-row';row.style.cssText='flex-wrap:wrap;gap:8px;border:none;';
     var n=document.createElement('div');n.className='backup-name';n.style.flex='1';n.textContent=u.username+(u.owner?T('ui.owner_2'):'');row.appendChild(n);
-    if(u.owner){var b=document.createElement('span');b.className='badge badge-op';b.textContent=ROLE_LABEL.owner;row.appendChild(b);list.appendChild(row);return;}
-    var sel=document.createElement('select');sel.className='inp';sel.style.cssText='max-width:130px;padding:5px 8px;';
-    ['viewer','mod','admin'].forEach(function(r){var o=document.createElement('option');o.value=r;o.textContent=ROLE_LABEL[r];if(r===u.role)o.selected=true;sel.appendChild(o);});
-    sel.onchange=function(){apiPost('/api/users/update',{username:u.username,role:sel.value}).then(function(){toast(T('ui.updated'));}).catch(function(e){toast(e.message,'err');loadUsers();});};
-    row.appendChild(sel);
+    var b=document.createElement('span');b.className='badge '+(u.owner?'badge-op':'badge-on');b.textContent=(ROLE_LABEL[u.role]||u.role)+' · '+T('ui.perm_count',{v0:u.perms.length});row.appendChild(b);
+    wrap.appendChild(row);list.appendChild(wrap);
+    if(u.owner)return;
+    if(myRole!=='owner'&&!u.perms.every(can))return;   // above your own level: read only
+    var ed=document.createElement('div');ed.style.display='none';var editor=null;
     function mk(t,fn){var x=document.createElement('button');x.className='btn btn-ghost';x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=t;x.onclick=fn;row.appendChild(x);}
+    mk(T('ui.edit_permissions'),function(){if(ed.style.display==='none'){ed.style.display='';if(!editor){editor=permEditor(ed,u.perms);var sv=document.createElement('button');sv.className='btn btn-primary';sv.textContent=T('ui.save_permissions');sv.onclick=function(){apiPost('/api/users/update',{username:u.username,perms:editor.get()}).then(function(){toast(T('ui.permissions_saved'));loadUsers();}).catch(function(e){toast(e.message,'err');});};ed.appendChild(sv);}}else ed.style.display='none';});
     mk(T('ui.reset_2fa'),function(){apiPost('/api/users/update',{username:u.username,resetTotp:true}).then(function(){toast(T('ui.done'));}).catch(function(e){toast(e.message,'err');});});
     mk(T('ui.new_password'),function(){var p=window.prompt(T('ui.enter_the_new_password_at_least_8_characters'));if(!p)return;apiPost('/api/users/update',{username:u.username,password:p}).then(function(){toast(T('ui.updated'));}).catch(function(e){toast(e.message,'err');});});
     mk(T('ui.delete_3'),function(){confirm2(T('ui.delete_user'),u.username+T('ui.this_user_loses_access_immediately_continue'),async function(){try{await apiPost('/api/users/delete',{username:u.username});toast(T('ui.user_deleted'));loadUsers();}catch(e){toast(e.message,'err');}});});
-    list.appendChild(row);});}
-async function addUser(){var nm=document.getElementById('nu-name'),pw=document.getElementById('nu-pass'),rl=document.getElementById('nu-role');
-  try{await apiPost('/api/users',{username:nm.value.trim(),password:pw.value,role:rl.value});nm.value='';pw.value='';toast(T('ui.user_added'));loadUsers();}catch(e){toast(e.message,'err');}}
+    wrap.appendChild(ed);});}
+async function addUser(){var nm=document.getElementById('nu-name'),pw=document.getElementById('nu-pass');
+  try{await apiPost('/api/users',{username:nm.value.trim(),password:pw.value,perms:nuEditor?nuEditor.get():[]});nm.value='';pw.value='';if(nuEditor&&PERM_META)nuEditor.set(PERM_META.presets.viewer||[]);toast(T('ui.user_added'));loadUsers();}catch(e){toast(e.message,'err');}}
 async function loadAudit(){try{var d=await fetch('/api/audit').then(function(r){return r.json();});renderAudit(d.entries||[]);}catch(e){}}
 function renderAudit(es){var box=document.getElementById('audit-list');
   if(!es.length){box.innerHTML=T('ui.no_activity_yet');return;}
@@ -1914,15 +2065,16 @@ function showPage(name){
     resetScrollTop();
     document.documentElement.style.overflow='';
     var target=document.getElementById('page-'+name);if(target)target.classList.add('active');
-    var order=['overview','console','players','files','backups','settings','account'],idx=order.indexOf(name);
+    var order=['overview','console','players','files','backups','schedule','settings','account'],idx=order.indexOf(name);
     if(idx>-1){document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});var tabs=Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));if(tabs[idx])tabs[idx].classList.add('active');}
     if(name!=='player-detail'){pdCurrentName=null;pdCurrent=null;}
     if(name==='overview')loadHistory();
     if(name==='files')loadFiles(currentFilePath);
-    if(name==='backups'){loadBackups();loadSchedule();loadOffsite();schTypeChanged();}
+    if(name==='backups'){loadBackups();loadDestinations();}
+    if(name==='schedule'){loadSchedule();loadDestinations();schTypeChanged();}
     if(name==='players')loadAllPlayers();
     if(name==='account')renderAccount();
-    if(name==='settings'){loadProps();loadStartupSettings();}
+    if(name==='settings'&&can('settings.view')){loadProps();loadStartupSettings();}
     if(name==='console'){setTimeout(function(){var a=document.getElementById('log');if(a&&autoScrollEnabled)a.scrollTop=a.scrollHeight;},50);}
     requestAnimationFrame(resetScrollTop);
   });

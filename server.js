@@ -46,7 +46,7 @@ const MC_LOG_FILE  = path.join(SERVER_DIR, '.mc-panel.log');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_HASH = process.env.ADMIN_HASH || bcrypt.hashSync(process.env.ADMIN_PASS, 12);
 if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
-const { createAuth, levelFor } = require('./lib/auth');
+const { createAuth, permFor, PERM_GROUPS, COMMAND_PERMS, IMPLIES } = require('./lib/auth');
 const auth = createAuth({ dir: SERVER_DIR, ownerUser: ADMIN_USER, ownerHash: ADMIN_HASH, t: {
   get badUser() { return t('srv.username_must_be_3_32_characters_letters_dig'); },
   get reservedUser() { return t('srv.that_name_is_reserved_for_the_owner'); },
@@ -147,7 +147,8 @@ function pushLog(line) { logBuffer.push(line); if (logBuffer.length > LOG_MAX) l
 
 function broadcast(data) {
   const msg = JSON.stringify(data);
-  wss.clients.forEach(c => { if (c.readyState === 1) c.send(msg); });
+  // console output only goes to users who may see the console (checked at send time, so a revoked permission takes effect at once)
+  wss.clients.forEach(c => { if (c.readyState === 1 && (data.type !== 'log' || auth.has(c.user, 'console.view'))) c.send(msg); });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -810,15 +811,17 @@ app.post('/api/login', rateLimit, (req, res) => {
 
 app.post('/api/logout', (req, res) => { auth.audit(req.session && req.session.user, req.ip, 'LOGOUT', ''); req.session.destroy(() => res.json({ success: true })); });
 
-// ── Roles: every /api route below needs a minimum role (see lib/auth.js) ──────
+// ── Permissions: every /api route below needs one permission (see lib/auth.js) ─────
 app.use('/api', (req, res, next) => {
-  const user = req.session && req.session.user, role = user && auth.roleOf(user);
-  if (!role) return res.status(401).json({ error: 'Unauthorized' });
-  if (auth.ROLES[role] < levelFor(req.method, req.path)) {
+  const user = req.session && req.session.user;
+  if (!user || !auth.roleOf(user)) return res.status(401).json({ error: 'Unauthorized' });
+  const need = permFor(req.method, req.path);
+  const ok = need === null || (need === '#command' ? auth.canUseConsoleInput(user) : need === '#owner' ? auth.roleOf(user) === 'owner' : auth.has(user, need));
+  if (!ok) {
     auth.audit(user, req.ip, 'DENIED ' + req.method + ' ' + req.path, '');
     return res.status(403).json({ error: t('srv.you_do_not_have_permission_for_this_action') });
   }
-  req.user = user; req.role = role;
+  req.user = user; req.role = auth.roleOf(user);
   if (req.method !== 'GET') {
     res.on('finish', () => {
       if (res.statusCode < 400) auth.audit(user, req.ip, req.method + ' ' + req.originalUrl.split('?')[0], auth.describeBody(req.body));
@@ -827,7 +830,8 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-app.get('/api/me', (req, res) => res.json({ username: req.user, role: req.role, level: auth.ROLES[req.role], twoFa: auth.twoFa.enabled(req.user) }));
+app.get('/api/me', (req, res) => res.json({ username: req.user, role: req.role, perms: auth.permsOf(req.user), console: auth.canUseConsoleInput(req.user), twoFa: auth.twoFa.enabled(req.user) }));
+app.get('/api/perms', (_req, res) => res.json({ groups: PERM_GROUPS, presets: auth.PRESETS, commands: COMMAND_PERMS, implies: IMPLIES }));
 app.post('/api/me/password', (req, res) => {
   const r = auth.changeOwnPassword(req.user, (req.body || {}).current, (req.body || {}).newPassword);
   r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
@@ -841,18 +845,38 @@ app.post('/api/me/2fa/disable', (req, res) => {
   const b = req.body || {}, r = auth.twoFa.disable(req.user, b.password, b.code);
   r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
 });
+// A user with "users" permission can only hand out permissions they hold themselves, and only touch users whose
+// permissions are a subset of theirs (so nobody can raise themselves or others above their own level).
+const subsetOf = (list, actor) => (list || []).every(p => auth.has(actor, p));
+function userGuard(req, res, targetPerms, newPerms) {
+  if (auth.roleOf(req.user) === 'owner') return true;
+  if (!subsetOf(targetPerms, req.user) || !subsetOf(newPerms, req.user)) {
+    res.status(403).json({ error: t('srv.you_cannot_grant_permissions_you_do_not_have') });
+    return false;
+  }
+  return true;
+}
+const listedPerms = name => { const u = auth.list().find(x => x.username === name); return u ? u.perms : []; };
 app.get('/api/users', (_req, res) => res.json({ users: auth.list() }));
 app.post('/api/users', (req, res) => {
-  const b = req.body || {}, r = auth.add(String(b.username || ''), b.password, b.role);
+  const b = req.body || {};
+  const want = Array.isArray(b.perms) ? b.perms : (auth.PRESETS[b.role] || []);
+  if (!userGuard(req, res, [], want)) return;
+  const r = auth.add(String(b.username || ''), b.password, b.role, Array.isArray(b.perms) ? b.perms : undefined);
   r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
 });
 app.post('/api/users/update', (req, res) => {
-  const b = req.body || {}, r = auth.update(String(b.username || ''), { role: b.role, password: b.password });
-  if (!r.error && b.resetTotp) auth.twoFa.reset(String(b.username));
+  const b = req.body || {}, name = String(b.username || '');
+  const want = Array.isArray(b.perms) ? b.perms : (b.role ? (auth.PRESETS[b.role] || []) : []);
+  if (!userGuard(req, res, listedPerms(name), want)) return;
+  const r = auth.update(name, { role: b.role, perms: Array.isArray(b.perms) ? b.perms : undefined, password: b.password });
+  if (!r.error && b.resetTotp) auth.twoFa.reset(name);
   r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
 });
 app.post('/api/users/delete', (req, res) => {
-  const r = auth.remove(String((req.body || {}).username || ''));
+  const name = String((req.body || {}).username || '');
+  if (!userGuard(req, res, listedPerms(name), [])) return;
+  const r = auth.remove(name);
   r.error ? res.status(404).json({ error: r.error }) : res.json({ success: true });
 });
 app.get('/api/audit', (_req, res) => res.json({ entries: auth.readAudit(200) }));
@@ -897,7 +921,7 @@ app.post('/api/restart', requireAuth, (_req, res) => {
 
 app.post('/api/command', requireAuth, (req, res) => {
   const cmd = sanitizeCommand(req.body.command);
-  if (cmd && !auth.commandAllowed(req.role, cmd)) return res.status(403).json({ error: t('srv.this_command_is_not_allowed_for_your_role') });
+  if (cmd && !auth.commandAllowed(req.user, cmd)) return res.status(403).json({ error: t('srv.this_command_is_not_allowed_for_your_role') });
   if (!cmd)         return res.status(400).json({ error: t('srv.invalid_command') });
   if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
   sendCommand(cmd);
@@ -1256,14 +1280,24 @@ app.post('/api/alerts/test', async (_req, res) => {
 // ── Off-site backup copies (rclone) ──────────────────────────────────────────
 const { createOffsite } = require('./lib/offsite');
 const offsite = createOffsite({ dir: SERVER_DIR });
-app.get('/api/backups/offsite', (_req, res) => res.json(offsite.get()));
-app.post('/api/backups/offsite', (req, res) => {
-  const r = offsite.set(req.body || {});
-  r.error ? res.status(400).json({ error: t('srv.invalid_remote_format_example_myremote_minec') }) : res.json({ success: true });
+const destError = code => {
+  if (code === 'notfound') return t('srv.destination_not_found');
+  if (code === 'limit') return t('srv.destination_limit_reached');
+  if (code === 'path') return t('srv.invalid_destination_path');
+  if (/^field:/.test(code)) return t('srv.destination_check_field', { v0: code.slice(6) });
+  return t('srv.invalid_destination_settings');
+};
+app.get('/api/backups/destinations', (_req, res) => res.json({ destinations: offsite.list(), types: offsite.TYPES, enums: offsite.ENUMS }));
+app.post('/api/backups/destinations', (req, res) => {
+  const r = offsite.save(req.body || {});
+  r.error ? res.status(400).json({ error: destError(r.error) }) : res.json({ success: true, id: r.id });
 });
-app.post('/api/backups/offsite/test', async (_req, res) => {
-  if (!offsite.get().remote) return res.status(400).json({ error: t('srv.enter_a_remote_first') });
-  try { await offsite.test(); res.json({ success: true }); }
+app.post('/api/backups/destinations/delete', (req, res) => {
+  const r = offsite.remove(String((req.body || {}).id || ''));
+  r.error ? res.status(404).json({ error: destError(r.error) }) : res.json({ success: true });
+});
+app.post('/api/backups/destinations/test', async (req, res) => {
+  try { await offsite.test(String((req.body || {}).id || '')); res.json({ success: true }); }
   catch (e) { res.status(502).json({ error: e.message }); }
 });
 
@@ -1354,7 +1388,11 @@ async function pruneBackups(keep) {
   return old.length;
 }
 
-async function createBackup(keep = 0) {
+// opts: { keep: keep the newest N local backups (0 = all), dests: destination ids (undefined = the "auto" ones),
+//         keepLocal: false deletes the local zip once every destination has it }
+async function createBackup(opts = {}) {
+  if (typeof opts === 'number') opts = { keep: opts };
+  const keep = opts.keep || 0;
   if (backupBusy) throw new Error('__BUSY__');
   backupBusy = true;
   const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
@@ -1377,12 +1415,16 @@ async function createBackup(keep = 0) {
     }
     await new Promise((resolve, reject) => { output.on('close', resolve); archive.on('error', reject); archive.finalize(); });
     const removed = await pruneBackups(keep);
-    let uploaded = false;
-    if (offsite.enabled()) {
-      try { await offsite.upload(out); uploaded = true; broadcast({ type: 'log', data: t('srv.panel_backup_copied_off_site') + name + '\n' }); }
-      catch (e) { broadcast({ type: 'log', data: t('srv.panel_off_site_copy_failed') + e.message + '\n' }); }
+    const ids = offsite.resolve(opts.dests);
+    let uploaded = 0, failed = 0;
+    for (const id of ids) {
+      try {
+        const r = await offsite.upload(id, out); uploaded++;
+        broadcast({ type: 'log', data: t('srv.panel_backup_copied_off_site') + name + ' → ' + offsite.name(id) + (r.removed ? t('srv.old_removed_suffix', { v0: r.removed }) : '') + '\n' });
+      } catch (e) { failed++; broadcast({ type: 'log', data: t('srv.panel_off_site_copy_failed') + offsite.name(id) + ': ' + e.message + '\n' }); }
     }
-    return { name, removed, uploaded };
+    if (opts.keepLocal === false && uploaded > 0 && !failed) await fsp.unlink(out).catch(() => {});
+    return { name, removed, uploaded: uploaded > 0, destinations: ids.length, failed };
   } finally {
     if (wasRunning && isRunning()) sendCommand('save-on');
     backupBusy = false;
@@ -1417,7 +1459,7 @@ const scheduler = createScheduler({
   actions: {
     isRunning,
     command: sendCommand,
-    backup: keep => createBackup(keep),
+    backup: opts => createBackup(opts),
     restart: warn => restartWithCountdown(warn),
   },
   t: {
@@ -1463,10 +1505,11 @@ app.get('/api/backups', requireAuth, async (_req, res) => {
   } catch { res.json({ backups: [] }); }
 });
 
-app.post('/api/backups/create', requireAuth, async (_req, res) => {
+app.post('/api/backups/create', requireAuth, async (req, res) => {
   try {
-    const { name } = await createBackup(0);
-    res.json({ success: true, name });
+    const b = req.body || {};
+    const { name, uploaded, failed } = await createBackup({ dests: Array.isArray(b.dests) ? b.dests.map(String) : undefined, keepLocal: b.keepLocal !== false });
+    res.json({ success: true, name, uploaded, failed });
   } catch (e) {
     res.status(e.message === '__BUSY__' ? 409 : 500).json({ error: t('srv.backup_failed') });
   }
@@ -1582,11 +1625,11 @@ server.on('upgrade', (req, socket, head) => {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       return socket.destroy();
     }
-    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+    wss.handleUpgrade(req, socket, head, ws => { ws.user = req.session.user; wss.emit('connection', ws, req); });
   });
 });
 wss.on('connection', ws => {
-  if (logBuffer.length) ws.send(JSON.stringify({ type: 'log', data: logBuffer.join('') }));
+  if (logBuffer.length && auth.has(ws.user, 'console.view')) ws.send(JSON.stringify({ type: 'log', data: logBuffer.join('') }));
 
   ws.send(JSON.stringify({
     type:    'status',

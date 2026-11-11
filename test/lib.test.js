@@ -9,7 +9,7 @@ const http = require('http');
 const bcrypt = require('bcryptjs');
 
 const { parseCron, cronMatches, createScheduler } = require('../lib/scheduler');
-const { createAuth, levelFor, ROLES } = require('../lib/auth');
+const { createAuth, permFor, PERMS, PRESETS } = require('../lib/auth');
 const { createMonitor, DISCORD_RE } = require('../lib/monitor');
 const totp = require('../lib/totp');
 
@@ -44,7 +44,7 @@ test('scheduler: validation, persistence, run', async () => {
   assert.strictEqual(mk().list().length, 1);               // survives a restart
 });
 
-test('auth: users, roles, route levels, command allow-list', () => {
+test('auth: users, presets, custom permissions, routes and commands', () => {
   const dir = tmp();
   const t = new Proxy({}, { get: (_, k) => String(k) });
   const a = createAuth({ dir, ownerUser: 'owner', ownerHash: bcrypt.hashSync('ownerpass', 4), t });
@@ -53,25 +53,54 @@ test('auth: users, roles, route levels, command allow-list', () => {
   assert.strictEqual(a.verify('ghost', 'x'), null);
   assert.ok(a.add('mod1', 'password123', 'mod').ok);
   assert.ok(a.add('mod1', 'password123', 'mod').error);      // duplicate
-  assert.ok(a.add('x', 'password123', 'mod').error);         // too short
+  assert.ok(a.add('x', 'password123', 'mod').error);         // name too short
   assert.ok(a.add('abc', 'short', 'mod').error);             // weak password
   assert.ok(a.add('abc', 'password123', 'owner').error);     // cannot create owners
   assert.ok(a.add('owner', 'password123', 'mod').error);     // reserved
   assert.strictEqual(a.roleOf('mod1'), 'mod');
-  assert.ok(a.update('mod1', { role: 'viewer' }).ok);
+  assert.ok(a.has('mod1', 'players.ban') && !a.has('mod1', 'players.op') && !a.has('mod1', 'server.stop'));
+  // custom list: unknown permissions are dropped, the label becomes "custom"
+  assert.ok(a.update('mod1', { perms: ['server.view', 'players.op', 'nope.x'] }).ok);
+  assert.strictEqual(a.roleOf('mod1'), 'custom');
+  assert.deepStrictEqual(a.permsOf('mod1'), ['server.view', 'players.view', 'players.op']);   // an action implies the view of its group
+  // picking exactly a preset's list gives the preset name back
+  assert.ok(a.update('mod1', { perms: PRESETS.viewer }).ok);
   assert.strictEqual(a.roleOf('mod1'), 'viewer');
+  assert.ok(a.add('cust', 'password123', undefined, ['files.view', 'backups.view']).ok);
+  assert.strictEqual(a.roleOf('cust'), 'custom');
+  assert.ok(a.has('owner', 'admin.users') && a.permsOf('owner').length === PERMS.length);
+  assert.ok(!a.has('mod1', 'admin.users') && !a.has('nobody', 'server.view'));
   assert.ok(a.remove('mod1').ok);
   assert.strictEqual(a.roleOf('mod1'), null);
-  assert.strictEqual(levelFor('GET', '/status'), 1);
-  assert.strictEqual(levelFor('POST', '/command'), 2);
-  assert.strictEqual(levelFor('POST', '/start'), 3);
-  assert.strictEqual(levelFor('GET', '/users'), 4);
-  assert.strictEqual(levelFor('GET', '/something-new'), 3);  // unknown routes default to admin
-  assert.ok(a.commandAllowed('mod', 'say hi'));
-  assert.ok(!a.commandAllowed('mod', 'stop'));
-  assert.ok(!a.commandAllowed('mod', 'execute as @a run op x'));
-  assert.ok(a.commandAllowed('admin', 'stop'));
-  assert.ok(ROLES.owner > ROLES.admin);
+  // routes
+  assert.strictEqual(permFor('GET', '/status'), 'server.view');
+  assert.strictEqual(permFor('POST', '/start'), 'server.start');
+  assert.strictEqual(permFor('POST', '/player/op'), 'players.op');   // OP is not a moderator action any more
+  assert.strictEqual(permFor('POST', '/player/kick'), 'players.kick');
+  assert.strictEqual(permFor('POST', '/files/delete'), 'files.delete');
+  assert.strictEqual(permFor('GET', '/users'), 'admin.users');
+  assert.strictEqual(permFor('GET', '/me'), null);
+  assert.strictEqual(permFor('GET', '/something-new'), '#owner');   // unknown routes: owner only
+  // commands
+  assert.ok(a.add('mod2', 'password123', 'mod').ok);
+  assert.ok(a.commandAllowed('mod2', 'say hi') && a.commandAllowed('mod2', '/ban x'));
+  assert.ok(!a.commandAllowed('mod2', 'stop') && !a.commandAllowed('mod2', 'op x') && !a.commandAllowed('mod2', 'execute as @a run op x'));
+  assert.ok(a.update('mod2', { perms: ['console.command'] }).ok);
+  assert.ok(a.commandAllowed('mod2', 'stop'));
+  assert.ok(a.commandAllowed('owner', 'stop'));
+  assert.ok(a.canUseConsoleInput('mod2') && !a.canUseConsoleInput('cust'));
+});
+
+test('auth: every route in server.js maps to a permission', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const open = new Set(['/api/login', '/api/logout', '/api/lang']);
+  const routes = [...src.matchAll(/app\.(get|post)\(\s*['`](\/api\/[^'`$]*)['`]/g)].map(m => [m[1].toUpperCase(), m[2].slice(4)]);
+  assert.ok(routes.length > 60);
+  for (const [method, p] of routes) {
+    if (open.has('/api' + p)) continue;
+    assert.notStrictEqual(permFor(method, p), '#owner', `${method} ${p} has no permission rule`);
+  }
+  for (const act of ['op', 'deop', 'ban', 'kick', 'unban', 'heal', 'feed', 'kill']) assert.notStrictEqual(permFor('POST', '/player/' + act), '#owner', act);
 });
 
 test('totp: RFC 6238 vectors and window', () => {
@@ -110,19 +139,46 @@ test('monitor: history, threshold alerts, cooldown, masking', async () => {
   srv.close();
 });
 
-test('offsite: remote validation and rclone arguments (no shell)', async () => {
+test('offsite: destinations, validation, secrets and rclone calls (no shell)', async () => {
   const { createOffsite } = require('../lib/offsite');
-  const calls = [];
-  const o = createOffsite({ dir: tmp(), exec: async (cmd, args) => { calls.push([cmd, ...args]); return ''; } });
-  assert.ok(o.set({ enabled: true, remote: 'bad remote; rm -rf /' }).error);
-  assert.ok(o.set({ enabled: true, remote: '$(touch x):path' }).error);
-  assert.ok(o.set({ enabled: true, remote: 's3:my-bucket/minecraft backups' }).ok);
-  assert.ok(o.enabled());
-  await o.upload('/srv/backups/backup-1.zip');
-  await o.test();
-  assert.deepStrictEqual(calls[0], ['rclone', 'copy', '/srv/backups/backup-1.zip', 's3:my-bucket/minecraft backups']);
-  assert.deepStrictEqual(calls[1], ['rclone', 'lsd', 's3:']);
-  assert.ok(o.set({ enabled: true, remote: '' }).ok && !o.enabled());   // no remote means disabled
+  const calls = [], dir = tmp();
+  const exec = async (cmd, args, opts = {}) => { calls.push({ cmd, args, env: opts.env, input: opts.input }); return args[0] === 'lsf' ? 'backup-2026-01-01.zip\nbackup-2026-01-02.zip\nbackup-2026-01-03.zip\nnotes.txt\n' : ''; };
+  const o = createOffsite({ dir, exec });
+  assert.ok(o.save({ type: 'bogus', path: 'x' }).error);
+  assert.ok(o.save({ type: 'b2', name: 'B', path: 'bucket/mc', params: { account: 'KEYID' } }).error);          // key missing
+  assert.ok(o.save({ type: 'b2', name: 'B', path: 'bad;rm -rf /', params: { account: 'a', key: 'k' } }).error);  // bad path
+  assert.ok(o.save({ type: 's3', name: 'S', path: 'b', params: { provider: 'Other', access_key_id: 'a', secret_access_key: 's' } }).error); // endpoint needed
+  assert.ok(o.save({ type: 'remote', path: '$(touch x):path' }).error);
+  const r = o.save({ type: 'b2', name: 'Backblaze', path: 'mybucket/minecraft', keepRemote: 2, auto: true, params: { account: 'KEYID', key: 'SECRETKEY' } });
+  assert.ok(r.ok);
+  const listed = o.list()[0];
+  assert.ok(listed.hasSecret.key && !JSON.stringify(listed).includes('SECRETKEY'));   // secrets never leave the server
+  assert.deepStrictEqual(o.resolve(undefined), [r.id]);                                 // auto destinations
+  assert.deepStrictEqual(o.resolve([]), []);                                            // explicit empty = local only
+  assert.ok(o.save({ id: r.id, type: 'b2', name: 'Backblaze', path: 'mybucket/minecraft', keepRemote: 2, auto: true, params: { account: 'KEYID2', key: '' } }).ok);   // blank secret keeps the old one
+  const up = await o.upload(r.id, '/srv/backups/backup-2026-01-04.zip');
+  const copy = calls.find(c => c.args[0] === 'copy');
+  assert.deepStrictEqual(copy.args.slice(0, 2), ['copy', '/srv/backups/backup-2026-01-04.zip']);
+  assert.ok(/^pd[a-z0-9]+:mybucket\/minecraft$/.test(copy.args[2]));
+  const envKeys = Object.keys(copy.env).filter(k => k.startsWith('RCLONE_CONFIG_'));
+  assert.ok(envKeys.some(k => k.endsWith('_TYPE') && copy.env[k] === 'b2'));
+  assert.ok(envKeys.some(k => k.endsWith('_ACCOUNT') && copy.env[k] === 'KEYID2') && envKeys.some(k => k.endsWith('_KEY') && copy.env[k] === 'SECRETKEY'));
+  assert.ok(!copy.args.join(' ').includes('SECRETKEY'));                                // not on the command line
+  assert.strictEqual(up.removed, 1);                                                    // 3 backups listed, keep 2: the oldest goes (notes.txt is ignored)
+  const dels = calls.filter(c => c.args[0] === 'deletefile').map(c => c.args[1]);
+  assert.ok(dels.length === 1 && dels[0].endsWith('/backup-2026-01-01.zip'));
+  // password types are obscured through rclone itself (stdin, not argv)
+  const s2 = o.save({ type: 'sftp', name: 'NAS', path: '/backups', params: { host: 'nas.local', user: 'u', pass: 'p@ss' } });
+  assert.ok(s2.ok);
+  await o.test(s2.id);
+  const ob = calls.find(c => c.args[0] === 'obscure');
+  assert.ok(ob && ob.input === 'p@ss' && !ob.args.join(' ').includes('p@ss'));
+  assert.ok(o.remove(s2.id).ok && o.list().length === 1);
+  // survives a restart; the old single-remote file format is migrated
+  assert.strictEqual(createOffsite({ dir, exec }).list().length, 1);
+  const dir2 = tmp(); fs.writeFileSync(path.join(dir2, '.panel-offsite.json'), JSON.stringify({ enabled: true, remote: 's3:bucket/mc' }));
+  const old = createOffsite({ dir: dir2, exec }).list();
+  assert.ok(old.length === 1 && old[0].type === 'remote' && old[0].auto);
 });
 
 test('downloads: hosts, hashes, file names', async () => {

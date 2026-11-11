@@ -36,7 +36,7 @@ test('every key used in the code and the page exists', () => {
   const used = new Set();
   for (const f of files) {
     const s = fs.readFileSync(path.join(root, f), 'utf8');
-    for (const m of s.matchAll(/\bT?t?\(\s*'((?:srv|ui)\.[a-z0-9_]*[a-z0-9])'/g)) used.add(m[1]);
+    for (const m of s.matchAll(/'((?:srv|ui)\.[a-z0-9_]*[a-z0-9])'/g)) used.add(m[1]);
     for (const m of s.matchAll(/@@((?:ui|meta)\.\w+)@@/g)) used.add(m[1]);
   }
   assert.ok(used.size > 400);
@@ -47,6 +47,14 @@ test('values placed into HTML attributes or text contain no quotes or tags', () 
   const html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
   for (const m of html.matchAll(/@@((?:ui|meta)\.\w+)@@/g)) {
     for (const [code, d] of Object.entries(langs)) assert.ok(!/["<>]/.test(d[m[1]]), `${code}:${m[1]}`);
+  }
+});
+
+test('every permission and group has a label', () => {
+  const { PERM_GROUPS } = require('../lib/auth');
+  for (const [g, acts] of Object.entries(PERM_GROUPS)) {
+    assert.ok(base['ui.pgroup_' + g], g);
+    for (const a of acts) assert.ok(base['ui.perm_' + g + '_' + a], g + '.' + a);
   }
 });
 
