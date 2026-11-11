@@ -6,7 +6,7 @@ A web control panel for managing a Minecraft (Paper/Spigot) server from the brow
 
 Compatible with every Minecraft version from **1.13 up to 26.3** and newer (updated for the latest release, 26.3). The panel itself does not depend on the game version, and it reads player files in both the old and new layouts (the new `players/` folder in 26.1+ and the old `playerdata/`).
 
-The project ships as two complete editions with identical features: the Arabic interface (RTL, repository root) and the English interface (LTR, in the `en/` folder).
+One codebase with two interface languages, Arabic (RTL) and English (LTR), driven by language files in `locales/`. Adding a language means adding one JSON file.
 
 ## Features
 
@@ -63,11 +63,11 @@ Then open `.env` and edit the values, especially `MC_DIR` (the real Minecraft se
 ## Running
 
 ```bash
-npm run start:en   # English interface (LTR)
-npm start          # Arabic interface (RTL)
+npm start                 # default language from PANEL_LANG (ar if unset)
+PANEL_LANG=en npm start   # English as the default language
 ```
 
-Run only one of the two on a given port. The panel opens on the port set in `PORT` (default 8080):
+The interface ships in Arabic (RTL) and English (LTR) from one codebase and language files. Each user switches language from the selector in the header (or on the sign-in page), stored in a cookie; `PANEL_LANG` is only the default. Error messages from the server follow the user's language too. The panel opens on the port set in `PORT` (default 8080):
 
 ```
 http://<machine-address>:8080
@@ -79,7 +79,7 @@ For permanent production use, run it under a process manager instead of directly
 
 ```bash
 npm install -g pm2
-pm2 start en/server.js --name mc-panel
+pm2 start server.js --name mc-panel
 pm2 save
 ```
 
@@ -97,6 +97,7 @@ pm2 save
 | `ADMIN_HASH` | Ready-made bcrypt hash used instead of `ADMIN_PASS` when present | - |
 | `SERVER_NAME` | Name shown in alert messages | name of the `MC_DIR` folder |
 | `COOKIE_SECURE` | `true` or `auto` to send the session cookie over HTTPS only (use `auto` behind Caddy/nginx) | off |
+| `PANEL_LANG` | Default interface language (`ar` or `en`) | `ar` |
 | `RCLONE_BIN` | Path to the rclone binary for off-site backups | `rclone` |
 
 Generate a `SESSION_SECRET`:
@@ -121,16 +122,15 @@ panel/
 ├── lib/totp.js         TOTP two-factor (RFC 6238)
 ├── lib/downloads.js    Modrinth and Paper downloads (fixed hosts, hash checks)
 ├── lib/tempbans.js     Timed bans
+├── lib/i18n.js         Language file loader and per-request translation
+├── locales/            Language files: ar.json, en.json (new language = new file)
 ├── test/               Automated tests (`npm test`)
 ├── Dockerfile, docker-compose.yml
 ├── deploy/             systemd, Caddy and nginx
 ├── package.json
 ├── .env.example
 ├── public/
-│   └── index.html      Arabic panel UI (HTML, CSS and JS in one file)
-├── en/                 The complete English edition
-│   ├── server.js
-│   └── public/index.html
+│   └── index.html      Panel UI (HTML, CSS and JS in one file, text from the language files)
 └── screenshots/        Screenshots (ar/ and en/)
 
 PanelDataLogger/         Optional companion Java plugin (separate Maven project, one jar that runs on every version from 1.13 to the latest)
@@ -223,7 +223,7 @@ The panel controls the server through tmux, so the panel and the server run in t
 
 **Tests**: `npm test` (GitHub Actions runs them on Node 18/20/22).
 
-**Limits of this release**: the panel manages a single server (for a network, run one panel per server), Velocity/BungeeCord are not supported as a server type, and the Arabic and English editions are still two separate files (the new shared logic lives in `lib/`).
+**Limits of this release**: the panel manages a single server (for a network, run one panel per server), Velocity/BungeeCord are not supported as a server type. To add a language, copy `locales/en.json` to `locales/<code>.json` and translate the values (the `meta.*` fields set direction and font).
 
 ## Security notes
 

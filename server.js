@@ -18,11 +18,13 @@ const archiver   = require('archiver');
 const unzipper   = require('unzipper');
 const os         = require('os');
 const zlib       = require('zlib');
+const i18n       = require('./lib/i18n');
+const { t }      = i18n;
 
 // مكتبة قراءة NBT (لملفات playerdata) — اختيارية، لا تُسقط اللوحة إذا لم تُثبَّت
 let nbt = null;
 try { nbt = require('prismarine-nbt'); }
-catch { console.warn('[Panel] prismarine-nbt غير مثبّتة — قراءة ملفات NBT المحفوظة ستكون معطّلة حتى تشغيل npm install'); }
+catch { console.warn(t('srv.panel_prismarine_nbt_not_installed_reading_s')); }
 
 // منفذ خادم HTTP المدمج داخل إضافة PanelDataLogger — يُستخدم للاستعلام المباشر
 // عن بيانات اللاعبين المتصلين (أدق وأسرع بكثير من قراءة كونسول أو ملف محفوظ)
@@ -46,16 +48,16 @@ const ADMIN_HASH = process.env.ADMIN_HASH || bcrypt.hashSync(process.env.ADMIN_P
 if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 const { createAuth, levelFor } = require('./lib/auth');
 const auth = createAuth({ dir: SERVER_DIR, ownerUser: ADMIN_USER, ownerHash: ADMIN_HASH, t: {
-  badUser: 'اسم المستخدم 3-32 حرفاً (أحرف إنجليزية وأرقام و _ . -)',
-  reservedUser: 'هذا الاسم محجوز للمالك',
-  badRole: 'دور غير صالح',
-  badPassword: 'كلمة المرور 8 أحرف على الأقل',
-  userExists: 'المستخدم موجود',
-  tooMany: 'وصلت للحد الأقصى من المستخدمين',
-  userNotFound: 'المستخدم غير موجود',
-  badCode: 'رمز التحقق غير صحيح',
-  ownerPwEnv: 'كلمة مرور المالك تُغيَّر من ملف .env',
-  wrongPassword: 'كلمة المرور الحالية خاطئة',
+  get badUser() { return t('srv.username_must_be_3_32_characters_letters_dig'); },
+  get reservedUser() { return t('srv.that_name_is_reserved_for_the_owner'); },
+  get badRole() { return t('srv.invalid_role'); },
+  get badPassword() { return t('srv.password_must_be_at_least_8_characters'); },
+  get userExists() { return t('srv.user_already_exists'); },
+  get tooMany() { return t('srv.user_limit_reached'); },
+  get userNotFound() { return t('srv.user_not_found'); },
+  get badCode() { return t('srv.invalid_verification_code'); },
+  get ownerPwEnv() { return t('srv.the_owner_password_is_changed_in_the_env_fil'); },
+  get wrongPassword() { return t('srv.current_password_is_wrong'); },
 } });
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ function rateLimit(req, res, next) {
   let e = loginAttempts.get(ip);
   if (!e || now > e.resetAt) { e = { count: 0, resetAt: now + 15*60*1000 }; loginAttempts.set(ip, e); }
   if (e.count >= 10)
-    return res.status(429).json({ error: `محاولات كثيرة. حاول بعد ${Math.ceil((e.resetAt-now)/1000)} ثانية.` });
+    return res.status(429).json({ error: t('srv.too_many_attempts_try_again_in_v0_seconds',{v0:Math.ceil((e.resetAt-now)/1000)}) });
   e.count++;
   next();
 }
@@ -110,7 +112,9 @@ const sessionMw = session({
   cookie: { maxAge: 86400000, httpOnly: true, sameSite: 'strict', secure: process.env.COOKIE_SECURE === 'true' ? true : process.env.COOKIE_SECURE === 'auto' ? 'auto' : false },
 });
 app.use(sessionMw);
-app.use(express.static(path.join(__dirname, 'public')));
+// اللغة لكل طلب: كوكي panel_lang ثم PANEL_LANG
+app.use((req, _res, next) => i18n.run(i18n.langFromCookie(req.headers.cookie), next));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 function requireAuth(req, res, next) {
   if (req.session?.user && auth.roleOf(req.session.user)) return next();
@@ -159,7 +163,7 @@ function loadPlayersDB() {
 }
 function savePlayersDBNow() {
   try { fs.writeFileSync(PLAYERS_DB_FILE, JSON.stringify(playersDB), 'utf8'); playersDirty = false; }
-  catch (e) { console.error('[Panel] فشل حفظ قاعدة بيانات اللاعبين:', e.message); }
+  catch (e) { console.error(t('srv.panel_failed_to_save_the_player_database'), e.message); }
 }
 setInterval(() => { if (playersDirty) savePlayersDBNow(); }, 5000);
 
@@ -489,16 +493,16 @@ async function queryPluginHttp(name) {
 
 // قراءة بيانات اللاعب من ملف NBT المحفوظ على القرص (يعمل للمتصلين وغير المتصلين، لكن بتأخر حسب آخر حفظ)
 async function readPlayerDataFromFile(uuid) {
-  if (!nbt) return { available: false, reason: 'مكتبة prismarine-nbt غير مثبّتة على السيرفر (npm install)' };
+  if (!nbt) return { available: false, reason: t('srv.the_prismarine_nbt_library_is_not_installed') };
   try {
     const p = playerFilePath(getWorldName(), 'playerdata', uuid);
-    if (!fs.existsSync(p)) return { available: false, reason: 'لا يوجد ملف بيانات في المسار: ' + p };
+    if (!fs.existsSync(p)) return { available: false, reason: t('srv.no_data_file_at_path') + p };
     const buf = await fsp.readFile(p);
     const { parsed } = await nbt.parse(buf);
     const d = nbt.simplify(parsed);
     return buildPlayerDataResult(d, false);
   } catch (e) {
-    return { available: false, reason: 'تعذّرت قراءة/تحليل ملف NBT: ' + e.message };
+    return { available: false, reason: t('srv.could_not_read_parse_file_nbt') + e.message };
   }
 }
 
@@ -607,7 +611,7 @@ function parseLogLine(line) {
           addDeath(player, {
             t: Date.now(), world,
             x: parseFloat(x), y: parseFloat(y), z: parseFloat(z),
-            cause: causeParts.join('|') || 'غير معروف',
+            cause: causeParts.join('|') || t('srv.unknown'),
           });
         }
       } else {
@@ -620,7 +624,7 @@ function parseLogLine(line) {
           });
         }
       }
-    } catch (e) { console.error('[Panel] فشل تحليل سطر PanelData:', e.message); }
+    } catch (e) { console.error(t('srv.panel_failed_to_parse_line_paneldata'), e.message); }
     return true; // مخفي عن الكونسول، مثل tps/list تماماً
   }
 
@@ -685,12 +689,12 @@ function startTmuxMonitor() {
     lastCpu         = null;
     cpuSample       = null;
     serverReady     = false;
-    if (!intentionalStop && !restartPending) monitor.event('crash', 'توقف السيرفر بشكل غير متوقع. تتم إعادة التشغيل تلقائياً.');
+    if (!intentionalStop && !restartPending) monitor.event('crash', t('srv.server_stopped_unexpectedly_restarting_autom'));
 
     // نظام التشغيل التلقائي إذا كان الإيقاف غير متعمد أو أمر ريستارت
     if (restartPending || !intentionalStop) {
       restartPending = false;
-      const restartMsg = '[Panel] جاري إعادة التشغيل التلقائي خلال 5 ثوانٍ...\n';
+      const restartMsg = t('srv.panel_auto_restarting_in_5_seconds');
       pushLog(restartMsg);
       broadcast({ type: 'log', data: restartMsg });
       setTimeout(() => {
@@ -767,23 +771,33 @@ function startMC() {
   startTmuxMonitor();
 
   broadcast({ type: 'status', running: true });
-  monitor.event('started', 'تم تشغيل السيرفر.');
+  monitor.event('started', t('srv.server_started'));
   return true;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+app.get('/', (req, res) => {
+  const lang = i18n.langFromCookie(req.headers.cookie);
+  res.type('html').send(i18n.renderPage(INDEX_HTML, lang));
+});
+app.post('/api/lang', (req, res) => {
+  const lang = req.body && req.body.lang;
+  if (!i18n.available().includes(lang)) return res.status(400).json({ error: 'bad language' });
+  res.cookie('panel_lang', lang, { maxAge: 365 * 86400000, sameSite: 'strict', httpOnly: false, secure: process.env.COOKIE_SECURE === 'true' });
+  res.json({ ok: true });
+});
 
 app.post('/api/login', rateLimit, (req, res) => {
   const { username, password } = req.body || {};
   const who = auth.verify(username, password);
   if (!who) {
     auth.audit(String(username || '').slice(0, 32), req.ip, 'LOGIN_FAILED', '');
-    return res.status(401).json({ error: 'بيانات خاطئة' });
+    return res.status(401).json({ error: t('srv.wrong_credentials') });
   }
   if (auth.twoFa.enabled(who.username) && !auth.twoFa.check(who.username, (req.body || {}).code)) {
     auth.audit(who.username, req.ip, 'LOGIN_2FA_FAILED', '');
-    return res.status(401).json({ error: (req.body || {}).code ? 'رمز التحقق غير صحيح' : 'أدخل رمز التحقق الثنائي', needCode: true });
+    return res.status(401).json({ error: (req.body || {}).code ? t('srv.invalid_verification_code') : t('srv.enter_your_two_factor_code'), needCode: true });
   }
   loginAttempts.delete(req.ip);
   req.session.regenerate(err => {
@@ -802,7 +816,7 @@ app.use('/api', (req, res, next) => {
   if (!role) return res.status(401).json({ error: 'Unauthorized' });
   if (auth.ROLES[role] < levelFor(req.method, req.path)) {
     auth.audit(user, req.ip, 'DENIED ' + req.method + ' ' + req.path, '');
-    return res.status(403).json({ error: 'ليست لديك صلاحية لهذا الإجراء' });
+    return res.status(403).json({ error: t('srv.you_do_not_have_permission_for_this_action') });
   }
   req.user = user; req.role = role;
   if (req.method !== 'GET') {
@@ -853,15 +867,15 @@ app.get('/api/status', requireAuth, (_req, res) => res.json({
 
 // ── Server control ────────────────────────────────────────────────────────────
 app.post('/api/start', requireAuth, (_req, res) => {
-  if (isRunning()) return res.status(409).json({ error: 'يعمل بالفعل' });
+  if (isRunning()) return res.status(409).json({ error: t('srv.already_running') });
   intentionalStop = false;
   const ok = startMC();
-  if (!ok) return res.status(500).json({ error: 'فشل تشغيل السيرفر' });
+  if (!ok) return res.status(500).json({ error: t('srv.failed_to_start_the_server') });
   res.json({ success: true });
 });
 
 app.post('/api/stop', requireAuth, (_req, res) => {
-  if (!isRunning()) return res.status(409).json({ error: 'متوقف' });
+  if (!isRunning()) return res.status(409).json({ error: t('srv.stopped') });
   restartPending  = false;
   intentionalStop = true; // تم الإيقاف يدوياً من اللوحة، لن يتم إعادة التشغيل
   sendCommand('stop');
@@ -872,7 +886,7 @@ app.post('/api/restart', requireAuth, (_req, res) => {
   if (!isRunning()) {
     intentionalStop = false;
     const ok = startMC();
-    if (!ok) return res.status(500).json({ error: 'فشل تشغيل السيرفر' });
+    if (!ok) return res.status(500).json({ error: t('srv.failed_to_start_the_server') });
     return res.json({ success: true });
   }
   restartPending  = true;
@@ -883,9 +897,9 @@ app.post('/api/restart', requireAuth, (_req, res) => {
 
 app.post('/api/command', requireAuth, (req, res) => {
   const cmd = sanitizeCommand(req.body.command);
-  if (cmd && !auth.commandAllowed(req.role, cmd)) return res.status(403).json({ error: 'هذا الأمر غير مسموح لدورك' });
-  if (!cmd)         return res.status(400).json({ error: 'أمر غير صالح' });
-  if (!isRunning()) return res.status(409).json({ error: 'السيرفر متوقف' });
+  if (cmd && !auth.commandAllowed(req.role, cmd)) return res.status(403).json({ error: t('srv.this_command_is_not_allowed_for_your_role') });
+  if (!cmd)         return res.status(400).json({ error: t('srv.invalid_command') });
+  if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
   sendCommand(cmd);
   res.json({ success: true });
 });
@@ -920,12 +934,12 @@ const { createTempBans } = require('./lib/tempbans');
 const tempBans = createTempBans({ dir: SERVER_DIR, isRunning, pardon: n => sendCommand(`pardon ${n}`) });
 app.post('/api/player/tempban', (req, res) => {
   const b = req.body || {}, p = sanitizePlayer(b.player);
-  if (!p) return res.status(400).json({ error: 'اسم لاعب غير صالح' });
+  if (!p) return res.status(400).json({ error: t('srv.invalid_player_name') });
   const minutes = parseInt(b.minutes, 10) || 0;
-  if (minutes < 0 || minutes > 525600) return res.status(400).json({ error: 'مدة غير صالحة' });
+  if (minutes < 0 || minutes > 525600) return res.status(400).json({ error: t('srv.invalid_duration') });
   const raw = String(b.reason || '').trim().slice(0, 100), reason = raw ? sanitizeCommand(raw) : '';
-  if (raw && !reason) return res.status(400).json({ error: 'سبب غير صالح' });
-  if (!isRunning()) return res.status(409).json({ error: 'السيرفر متوقف' });
+  if (raw && !reason) return res.status(400).json({ error: t('srv.invalid_reason') });
+  if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
   sendCommand('ban ' + p + (reason ? ' ' + reason : ''));
   minutes > 0 ? tempBans.add(p, minutes) : tempBans.remove(p);
   res.json({ success: true });
@@ -948,8 +962,8 @@ const PLAYER_ACTIONS = {
 Object.entries(PLAYER_ACTIONS).forEach(([action, fn]) => {
   app.post(`/api/player/${action}`, requireAuth, (req, res) => {
     const p = sanitizePlayer(req.body.player);
-    if (!p)           return res.status(400).json({ error: 'اسم لاعب غير صالح' });
-    if (!isRunning()) return res.status(409).json({ error: 'السيرفر متوقف' });
+    if (!p)           return res.status(400).json({ error: t('srv.invalid_player_name') });
+    if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
     sendCommand(fn(p));
     if (action === 'ban' || action === 'pardon') tempBans.remove(p);
     res.json({ success: true });
@@ -992,7 +1006,7 @@ app.get('/api/players/all', requireAuth, (_req, res) => {
 
 app.get('/api/players/detail', requireAuth, async (req, res) => {
   const name = sanitizePlayer(req.query.name);
-  if (!name) return res.status(400).json({ error: 'اسم لاعب غير صالح' });
+  if (!name) return res.status(400).json({ error: t('srv.invalid_player_name') });
   const rec = getPlayerRecord(name);
   const { uuid, guessed } = await resolveUuid(name);
   const worldName = getWorldName();
@@ -1025,17 +1039,17 @@ app.get('/api/players/detail', requireAuth, async (req, res) => {
 // ── حذف بيانات لاعب (مخزون/صندوق سحري/خبرة عبر إعادة كتابة ملف NBT، إحصائيات/تقدم كملفات، وسجل اللوحة) ──
 app.post('/api/players/delete-data', requireAuth, async (req, res) => {
   const name = sanitizePlayer(req.body.name);
-  if (!name) return res.status(400).json({ error: 'اسم لاعب غير صالح' });
+  if (!name) return res.status(400).json({ error: t('srv.invalid_player_name') });
   const parts = req.body.parts || {};
   const rec = getPlayerRecord(name);
-  if (rec.online) return res.status(409).json({ error: 'لا يمكن حذف بيانات لاعب متصل الآن — أخرجه من السيرفر أولاً' });
+  if (rec.online) return res.status(409).json({ error: t('srv.cannot_delete_data_of_a_player_who_is_online') });
 
   const { uuid } = await resolveUuid(name);
   const worldName = getWorldName();
   const results = {};
 
   if ((parts.inventory || parts.enderChest || parts.xp)) {
-    if (!nbt) return res.status(500).json({ error: 'مكتبة prismarine-nbt غير مثبّتة على السيرفر (npm install)' });
+    if (!nbt) return res.status(500).json({ error: t('srv.the_prismarine_nbt_library_is_not_installed') });
     try {
       const p = playerFilePath(worldName, 'playerdata', uuid);
       if (fs.existsSync(p)) {
@@ -1062,7 +1076,7 @@ app.post('/api/players/delete-data', requireAuth, async (req, res) => {
         results.fileNotFound = true;
       }
     } catch (e) {
-      return res.status(500).json({ error: 'فشل تعديل ملف اللاعب: ' + e.message });
+      return res.status(500).json({ error: t('srv.failed_to_modify_the_player_file') + e.message });
     }
   }
 
@@ -1097,7 +1111,7 @@ app.post('/api/players/delete-data', requireAuth, async (req, res) => {
 app.get('/api/files', requireAuth, async (req, res) => {
   const rel = String(req.query.path || '');
   const abs = safePath(rel);
-  if (!abs) return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   try {
     const entries = await fsp.readdir(abs, { withFileTypes: true });
     const files = await Promise.all(entries
@@ -1113,73 +1127,73 @@ app.get('/api/files', requireAuth, async (req, res) => {
       return a.name.localeCompare(b.name);
     });
     res.json({ files });
-  } catch { res.status(500).json({ error: 'فشل قراءة المجلد' }); }
+  } catch { res.status(500).json({ error: t('srv.failed_to_read_the_folder') }); }
 });
 
 app.get('/api/files/read', requireAuth, async (req, res) => {
   const rel = String(req.query.path || '');
   const abs = safePath(rel);
-  if (!abs) return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   try {
     const stat = await fsp.stat(abs);
-    if (!stat.isFile())            return res.status(400).json({ error: 'ليس ملفاً' });
-    if (stat.size > MAX_EDIT_SIZE) return res.status(413).json({ error: 'الملف كبير جداً (>2MB)' });
+    if (!stat.isFile())            return res.status(400).json({ error: t('srv.not_a_file') });
+    if (stat.size > MAX_EDIT_SIZE) return res.status(413).json({ error: t('srv.file_is_too_large_2mb') });
     const ext = path.extname(abs).toLowerCase();
-    if (!EDITABLE_EXT.has(ext))    return res.status(415).json({ error: 'نوع ملف غير قابل للتعديل' });
+    if (!EDITABLE_EXT.has(ext))    return res.status(415).json({ error: t('srv.file_type_cannot_be_edited') });
     const content = await fsp.readFile(abs, 'utf8');
     res.json({ content });
-  } catch { res.status(500).json({ error: 'فشل قراءة الملف' }); }
+  } catch { res.status(500).json({ error: t('srv.failed_to_read_the_file') }); }
 });
 
 app.post('/api/files/write', requireAuth, async (req, res) => {
   const rel = String(req.body.path || '');
   const abs = safePath(rel);
-  if (!abs) return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   const content = String(req.body.content ?? '');
-  if (content.length > MAX_EDIT_SIZE) return res.status(413).json({ error: 'المحتوى كبير جداً' });
+  if (content.length > MAX_EDIT_SIZE) return res.status(413).json({ error: t('srv.content_is_too_large') });
   const ext = path.extname(abs).toLowerCase();
-  if (!EDITABLE_EXT.has(ext)) return res.status(415).json({ error: 'نوع ملف غير قابل للتعديل' });
+  if (!EDITABLE_EXT.has(ext)) return res.status(415).json({ error: t('srv.file_type_cannot_be_edited') });
   try {
     await fsp.writeFile(abs, content, 'utf8');
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'فشل الكتابة' }); }
+  } catch { res.status(500).json({ error: t('srv.write_failed') }); }
 });
 
 app.post('/api/files/upload', requireAuth, (req, res) => {
   const relPath = decodeURIComponent(req.headers['x-path'] || '');
   const fileName = decodeURIComponent(req.headers['x-filename'] || '');
   const absDir = safePath(relPath);
-  if (!absDir) return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!absDir) return res.status(400).json({ error: t('srv.invalid_path') });
   const absFile = path.join(absDir, fileName);
-  if (!absFile.startsWith(SERVER_DIR)) return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!absFile.startsWith(SERVER_DIR)) return res.status(400).json({ error: t('srv.invalid_path') });
 
   const writeStream = fs.createWriteStream(absFile);
   req.pipe(writeStream);
   req.on('end', () => res.json({ success: true }));
-  req.on('error', () => res.status(500).json({ error: 'فشل الرفع' }));
+  req.on('error', () => res.status(500).json({ error: t('srv.upload_failed') }));
 });
 
 // ── تنزيل ملف ────────────────────────────────────────────────────────────────
 app.get('/api/files/download', requireAuth, async (req, res) => {
   const rel = String(req.query.path || '');
   const abs = safePath(rel);
-  if (!abs) return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   try {
     const stat = await fsp.stat(abs);
-    if (!stat.isFile()) return res.status(400).json({ error: 'المجلدات لا يمكن تنزيلها مباشرة' });
+    if (!stat.isFile()) return res.status(400).json({ error: t('srv.folders_cannot_be_downloaded_directly') });
     res.download(abs, path.basename(abs));
-  } catch { res.status(404).json({ error: 'الملف غير موجود' }); }
+  } catch { res.status(404).json({ error: t('srv.file_not_found') }); }
 });
 
 app.post('/api/files/delete', requireAuth, async (req, res) => {
   const rel = String(req.body.path || '');
   const abs = safePath(rel);
-  if (!abs)               return res.status(400).json({ error: 'مسار غير صالح' });
-  if (abs === SERVER_DIR) return res.status(400).json({ error: 'لا يمكن حذف الجذر' });
+  if (!abs)               return res.status(400).json({ error: t('srv.invalid_path') });
+  if (abs === SERVER_DIR) return res.status(400).json({ error: t('srv.cannot_delete_the_root') });
   try {
     await fsp.rm(abs, { recursive: true, force: true });
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'فشل الحذف' }); }
+  } catch { res.status(500).json({ error: t('srv.delete_failed') }); }
 });
 
 // ── إعادة تسمية / نقل ملف أو مجلد ─────────────────────────────────────────────
@@ -1187,16 +1201,16 @@ app.post('/api/files/rename', requireAuth, async (req, res) => {
   const relFrom = String(req.body.path || '');
   const newName = String(req.body.newName || '').trim();
   const absFrom = safePath(relFrom);
-  if (!absFrom)  return res.status(400).json({ error: 'مسار غير صالح' });
+  if (!absFrom)  return res.status(400).json({ error: t('srv.invalid_path') });
   if (!newName || /[\\/]/.test(newName) || newName === '.' || newName === '..')
-    return res.status(400).json({ error: 'اسم غير صالح' });
+    return res.status(400).json({ error: t('srv.invalid_name') });
   const absTo = path.join(path.dirname(absFrom), newName);
-  if (!safePath(path.relative(SERVER_DIR, absTo))) return res.status(400).json({ error: 'مسار هدف غير صالح' });
+  if (!safePath(path.relative(SERVER_DIR, absTo))) return res.status(400).json({ error: t('srv.invalid_target_path') });
   try {
-    if (fs.existsSync(absTo)) return res.status(409).json({ error: 'يوجد ملف/مجلد بنفس الاسم' });
+    if (fs.existsSync(absTo)) return res.status(409).json({ error: t('srv.a_file_folder_with_that_name_already_exists') });
     await fsp.rename(absFrom, absTo);
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'فشل إعادة التسمية' }); }
+  } catch { res.status(500).json({ error: t('srv.rename_failed') }); }
 });
 
 // ── Monitoring history + alerts ──────────────────────────────────────────────
@@ -1229,14 +1243,14 @@ app.get('/api/monitor/history', (_req, res) => res.json(monitor.history()));
 app.get('/api/alerts', (_req, res) => res.json(monitor.getConfig()));
 app.post('/api/alerts', (req, res) => {
   const r = monitor.setConfig(req.body || {});
-  if (r.error) return res.status(400).json({ error: r.error === 'discord' ? 'رابط Discord webhook غير صالح' : 'بيانات Telegram غير صالحة' });
+  if (r.error) return res.status(400).json({ error: r.error === 'discord' ? t('srv.invalid_discord_webhook_url') : t('srv.invalid_telegram_details') });
   res.json({ success: true });
 });
 app.post('/api/alerts/test', async (_req, res) => {
   const c = monitor.getConfig();
-  if (!c.hasDiscord && !c.hasTelegram) return res.status(400).json({ error: 'لم تضبط قناة تنبيه (Discord أو Telegram) بعد' });
+  if (!c.hasDiscord && !c.hasTelegram) return res.status(400).json({ error: t('srv.no_alert_channel_discord_or_telegram_is_conf') });
   const failed = await monitor.test();
-  failed.length ? res.status(502).json({ error: 'فشل الإرسال' + ': ' + failed.join('; ') }) : res.json({ success: true });
+  failed.length ? res.status(502).json({ error: t('srv.delivery_failed') + ': ' + failed.join('; ') }) : res.json({ success: true });
 });
 
 // ── Off-site backup copies (rclone) ──────────────────────────────────────────
@@ -1245,10 +1259,10 @@ const offsite = createOffsite({ dir: SERVER_DIR });
 app.get('/api/backups/offsite', (_req, res) => res.json(offsite.get()));
 app.post('/api/backups/offsite', (req, res) => {
   const r = offsite.set(req.body || {});
-  r.error ? res.status(400).json({ error: 'صيغة الوجهة غير صالحة (مثال: myremote:minecraft)' }) : res.json({ success: true });
+  r.error ? res.status(400).json({ error: t('srv.invalid_remote_format_example_myremote_minec') }) : res.json({ success: true });
 });
 app.post('/api/backups/offsite/test', async (_req, res) => {
-  if (!offsite.get().remote) return res.status(400).json({ error: 'أدخل وجهة أولاً' });
+  if (!offsite.get().remote) return res.status(400).json({ error: t('srv.enter_a_remote_first') });
   try { await offsite.test(); res.json({ success: true }); }
   catch (e) { res.status(502).json({ error: e.message }); }
 });
@@ -1257,12 +1271,8 @@ app.post('/api/backups/offsite/test', async (_req, res) => {
 const downloads = require('./lib/downloads').createDownloads();
 const PLUGINS_DIR = path.join(SERVER_DIR, 'plugins');
 const PLUGIN_FILE_RE = /^[\w.+ -]{1,120}\.jar(\.disabled)?$/;
-const DL_ERRORS = {
-  'no compatible version': 'لا توجد نسخة متوافقة مع إصدار سيرفرك', 'checksum mismatch': 'فشل التحقق من سلامة الملف (checksum)',
-  'file too large': 'الملف كبير جداً', 'blocked host': 'مصدر غير مسموح', 'bad file name': 'اسم ملف غير صالح',
-  'bad project': 'معرّف غير صالح', 'bad version': 'إصدار غير صالح', 'no file': 'لا يوجد ملف للتنزيل', 'no download': 'لا يوجد تنزيل لهذا الإصدار',
-};
-const dlError = e => DL_ERRORS[e && e.message] || (e && e.message) || 'فشلت العملية';
+const DL_ERRORS = new Set(["no compatible version", "checksum mismatch", "file too large", "blocked host", "bad file name", "bad project", "bad version", "no file", "no download"]);
+const dlError = e => (e && DL_ERRORS.has(e.message)) ? t('srv.dl_' + e.message.replace(/ /g, '_')) : ((e && e.message) || t('srv.operation_failed'));
 const mcVersionOnly = () => ((serverVersion || '').match(/\d+\.\d+(?:\.\d+)?/) || [null])[0];
 
 async function pluginMeta(full) {
@@ -1295,18 +1305,18 @@ function pluginPath(name) {
 }
 app.post('/api/plugins/toggle', async (req, res) => {
   const p = pluginPath((req.body || {}).file);
-  if (!p) return res.status(400).json({ error: 'اسم ملف غير صالح' });
+  if (!p) return res.status(400).json({ error: t('srv.invalid_file_name') });
   try {
     const to = p.endsWith('.disabled') ? p.slice(0, -'.disabled'.length) : p + '.disabled';
     await fsp.rename(p, to);
     res.json({ success: true });
-  } catch { res.status(404).json({ error: 'الملف غير موجود' }); }
+  } catch { res.status(404).json({ error: t('srv.file_not_found') }); }
 });
 app.post('/api/plugins/delete', async (req, res) => {
   const p = pluginPath((req.body || {}).file);
-  if (!p) return res.status(400).json({ error: 'اسم ملف غير صالح' });
+  if (!p) return res.status(400).json({ error: t('srv.invalid_file_name') });
   try { await fsp.unlink(p); res.json({ success: true }); }
-  catch { res.status(404).json({ error: 'الملف غير موجود' }); }
+  catch { res.status(404).json({ error: t('srv.file_not_found') }); }
 });
 app.get('/api/plugins/search', async (req, res) => {
   try { res.json({ results: await downloads.searchPlugins(req.query.q, mcVersionOnly()) }); }
@@ -1326,7 +1336,7 @@ app.post('/api/jars/paper', async (req, res) => {
     const r = await downloads.downloadPaper(b.version, SERVER_DIR);
     if (b.eula === true) {
       await fsp.writeFile(path.join(SERVER_DIR, 'eula.txt'), '# Accepted by the panel user (https://aka.ms/MinecraftEULA)\neula=true\n');
-      broadcast({ type: 'log', data: '[Panel] تم تسجيل قبول EULA بطلبك' + '\n' });
+      broadcast({ type: 'log', data: t('srv.panel_eula_accepted_at_your_request') + '\n' });
     }
     res.json({ success: true, ...r });
   } catch (e) { res.status(502).json({ error: dlError(e) }); }
@@ -1369,8 +1379,8 @@ async function createBackup(keep = 0) {
     const removed = await pruneBackups(keep);
     let uploaded = false;
     if (offsite.enabled()) {
-      try { await offsite.upload(out); uploaded = true; broadcast({ type: 'log', data: '[Panel] رُفعت النسخة إلى الوجهة الخارجية: ' + name + '\n' }); }
-      catch (e) { broadcast({ type: 'log', data: '[Panel] فشل رفع النسخة الخارجي: ' + e.message + '\n' }); }
+      try { await offsite.upload(out); uploaded = true; broadcast({ type: 'log', data: t('srv.panel_backup_copied_off_site') + name + '\n' }); }
+      catch (e) { broadcast({ type: 'log', data: t('srv.panel_off_site_copy_failed') + e.message + '\n' }); }
     }
     return { name, removed, uploaded };
   } finally {
@@ -1411,12 +1421,12 @@ const scheduler = createScheduler({
     restart: warn => restartWithCountdown(warn),
   },
   t: {
-    badType: 'نوع المهمة غير صالح', badCron: 'جدول cron غير صالح', badArg: 'النص أو الأمر غير صالح', tooMany: 'وصلت للحد الأقصى من المهام (50)', notFound: 'المهمة غير موجودة',
-    alreadyRunning: 'المهمة تعمل الآن', skippedBusy: 'تخطي: إعادة تشغيل جارية', skippedStopped: 'تخطي: السيرفر متوقف',
-    ranBackup: (n, b, r) => `[Panel] مهمة مجدولة "${n}": نسخة ${b}${r ? ` (حُذف ${r} قديمة)` : ''}\n`,
-    ranRestart: (n, w) => `[Panel] مهمة مجدولة "${n}": إعادة تشغيل بعد ${w} ثانية\n`,
-    ranGeneric: n => `[Panel] مهمة مجدولة "${n}" نُفّذت\n`,
-    failed: (n, e) => `[Panel] فشلت المهمة "${n}": ${e}\n`,
+    get badType() { return t('srv.invalid_task_type'); }, get badCron() { return t('srv.invalid_cron_schedule'); }, get badArg() { return t('srv.invalid_text_or_command'); }, get tooMany() { return t('srv.task_limit_reached_50'); }, get notFound() { return t('srv.task_not_found'); },
+    get alreadyRunning() { return t('srv.task_is_already_running'); }, get skippedBusy() { return t('srv.skipped_restart_already_in_progress'); }, get skippedStopped() { return t('srv.skipped_server_is_stopped'); },
+    ranBackup: (n, b, r) => t('srv.panel_scheduled_task_v0_backup_v1',{v0:n,v1:b}) + (r ? t('srv.old_removed_suffix',{v0:r}) : '') + '\n',
+    ranRestart: (n, w) => t('srv.panel_scheduled_task_v0_restarting_in_v1_s',{v0:n,v1:w}),
+    ranGeneric: n => t('srv.panel_scheduled_task_v0_ran',{v0:n}),
+    failed: (n, e) => t('srv.panel_task_v0_failed_v1',{v0:n,v1:e}),
   },
 });
 
@@ -1430,11 +1440,11 @@ app.post('/api/schedule/update', requireAuth, (req, res) => {
   r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true, task: r.task });
 });
 app.post('/api/schedule/delete', requireAuth, (req, res) => {
-  scheduler.remove(String((req.body || {}).id || '')) ? res.json({ success: true }) : res.status(404).json({ error: 'المهمة غير موجودة' });
+  scheduler.remove(String((req.body || {}).id || '')) ? res.json({ success: true }) : res.status(404).json({ error: t('srv.task_not_found') });
 });
 app.post('/api/schedule/run', requireAuth, async (req, res) => {
   const status = await scheduler.runNow(String((req.body || {}).id || ''));
-  status === null ? res.status(404).json({ error: 'المهمة غير موجودة' }) : res.json({ success: true, status });
+  status === null ? res.status(404).json({ error: t('srv.task_not_found') }) : res.json({ success: true, status });
 });
 
 // ── Backups API ───────────────────────────────────────────────────────────────
@@ -1458,15 +1468,15 @@ app.post('/api/backups/create', requireAuth, async (_req, res) => {
     const { name } = await createBackup(0);
     res.json({ success: true, name });
   } catch (e) {
-    res.status(e.message === '__BUSY__' ? 409 : 500).json({ error: 'فشل إنشاء النسخة' });
+    res.status(e.message === '__BUSY__' ? 409 : 500).json({ error: t('srv.backup_failed') });
   }
 });
 
 app.post('/api/backups/restore', requireAuth, async (req, res) => {
   const name = String(req.body.name || '');
-  if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: 'اسم غير صالح' });
+  if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: t('srv.invalid_name') });
   const file = path.join(BACKUPS_DIR, name);
-  if (!fs.existsSync(file))         return res.status(404).json({ error: 'النسخة غير موجودة' });
+  if (!fs.existsSync(file))         return res.status(404).json({ error: t('srv.backup_not_found') });
 
   if (isRunning()) {
     intentionalStop = true; // إيقاف متعمد لإرجاع النسخة
@@ -1496,16 +1506,16 @@ app.post('/api/backups/restore', requireAuth, async (req, res) => {
 
 app.post('/api/backups/delete', requireAuth, async (req, res) => {
   const name = String(req.body.name || '');
-  if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: 'اسم غير صالح' });
+  if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: t('srv.invalid_name') });
   try { await fsp.unlink(path.join(BACKUPS_DIR, name)); res.json({ success: true }); }
-  catch { res.status(500).json({ error: 'فشل الحذف' }); }
+  catch { res.status(500).json({ error: t('srv.delete_failed') }); }
 });
 
 app.get('/api/backups/download', requireAuth, (req, res) => {
   const name = String(req.query.name || '');
-  if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: 'اسم غير صالح' });
+  if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: t('srv.invalid_name') });
   const file = path.join(BACKUPS_DIR, name);
-  if (!fs.existsSync(file)) return res.status(404).json({ error: 'غير موجود' });
+  if (!fs.existsSync(file)) return res.status(404).json({ error: t('srv.not_found') });
   res.download(file);
 });
 
@@ -1522,7 +1532,7 @@ app.get('/api/settings/properties', requireAuth, async (_req, res) => {
       if (m) props[m[1].trim()] = m[2].trim();
     });
     res.json({ props });
-  } catch { res.status(500).json({ error: 'فشل القراءة' }); }
+  } catch { res.status(500).json({ error: t('srv.read_failed') }); }
 });
 
 app.post('/api/settings/properties', requireAuth, async (req, res) => {
@@ -1546,7 +1556,7 @@ app.post('/api/settings/properties', requireAuth, async (req, res) => {
                 Object.entries(existing).map(([k,v]) => `${k}=${v}`).join('\n') + '\n';
     await fsp.writeFile(PROPS_FILE, out, 'utf8');
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'فشل الحفظ' }); }
+  } catch { res.status(500).json({ error: t('srv.save_failed') }); }
 });
 
 // ── Settings: startup (JVM) ───────────────────────────────────────────────────
@@ -1557,12 +1567,12 @@ app.get('/api/settings/startup', requireAuth, (_req, res) => {
 app.post('/api/settings/startup', requireAuth, async (req, res) => {
   const { xms, xmx, g1gc, extraFlags } = req.body;
   const memRe = /^\d+[MG]$/;
-  if (!memRe.test(xms) || !memRe.test(xmx)) return res.status(400).json({ error: 'قيم ذاكرة غير صالحة' });
+  if (!memRe.test(xms) || !memRe.test(xmx)) return res.status(400).json({ error: t('srv.invalid_memory_values') });
   const cfg = { xms, xmx, g1gc: !!g1gc, extraFlags: String(extraFlags || '') };
   try {
     await fsp.writeFile(STARTUP_CFG, JSON.stringify(cfg, null, 2), 'utf8');
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'فشل الحفظ' }); }
+  } catch { res.status(500).json({ error: t('srv.save_failed') }); }
 });
 
 // ── WebSocket (session required) ─────────────────────────────────────────────
@@ -1672,7 +1682,7 @@ function startTpsPolling() {
 function checkServerReady(line) {
   if (!serverReady && /Done \(\d+\.\d+s\)! For help/.test(line)) {
     serverReady = true;
-    const msg = '[Panel] السيرفر جاهز — بدء مراقبة TPS\n';
+    const msg = t('srv.panel_server_is_ready_started_monitoring_tps');
     pushLog(msg); broadcast({ type: 'log', data: msg });
     startTpsPolling();
   }

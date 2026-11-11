@@ -14,10 +14,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json server.js ./
 COPY lib ./lib
+COPY locales ./locales
 COPY public ./public
-COPY en ./en
 ENV PORT=8080 MC_DIR=/data NODE_ENV=production
 VOLUME /data
 EXPOSE 8080 25565
-# Arabic edition by default. For the English edition use: CMD ["node", "en/server.js"]
+# Language: Arabic by default; set PANEL_LANG=en for English (users can also switch in the UI).
 CMD ["node", "server.js"]

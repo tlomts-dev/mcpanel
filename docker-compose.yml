@@ -2,12 +2,12 @@
 services:
   panel:
     build: .
-    # command: ["node", "en/server.js"]   # uncomment for the English edition
     restart: unless-stopped
     env_file: .env
     environment:
       MC_DIR: /data
       TMUX_SESSION: mcserver
+      # PANEL_LANG: en    # default interface language (ar / en); users can switch in the UI
     ports:
       - "8080:8080"      # panel (put HTTPS in front of it, see deploy/Caddyfile)
       - "25565:25565"    # Minecraft

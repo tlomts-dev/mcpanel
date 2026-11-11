@@ -1,7 +1,7 @@
 {
   "name": "mc-panel",
   "version": "1.2.0",
-  "description": "لوحة تحكم ويب لإدارة سيرفر Minecraft (عربي + English): تشغيل/إيقاف، كونسول مباشر، إدارة لاعبين، ملفات، نسخ احتياطية | Web control panel for Minecraft servers (Arabic + English)",
+  "description": "لوحة تحكم ويب لإدارة سيرفر Minecraft (عربي + English، ملفات لغة): تشغيل/إيقاف، كونسول مباشر، إدارة لاعبين، ملفات، نسخ احتياطية | Web control panel for Minecraft servers (Arabic + English)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
