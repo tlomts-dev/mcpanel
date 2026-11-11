@@ -692,5 +692,6 @@
  "ui.toast_wl_off": "تعطيل Whitelist",
  "ui.pl_tab_installed": "المثبّتة",
  "ui.pl_tab_browse": "تصفّح الإضافات",
- "ui.pl_popular": "الأشهر تنزيلاً (Modrinth)"
+ "ui.pl_popular": "الأشهر تنزيلاً (Modrinth)",
+ "ui.pl_installed_badge": "مثبّتة"
 }

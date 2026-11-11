@@ -1833,7 +1833,10 @@ async function tfaDisable(){try{await apiPost('/api/me/2fa/disable',{password:do
 
 
 // ════════════ PLUGINS + SERVER JAR ════════════
-async function loadPlugins(){try{var d=await fetch('/api/plugins').then(function(r){return r.json();});document.getElementById('pl-ver').textContent=d.mcVersion?('MC '+d.mcVersion):'';renderPlugins(d.plugins||[]);}catch(e){}}
+async function loadPlugins(){try{var d=await fetch('/api/plugins').then(function(r){return r.json();});document.getElementById('pl-ver').textContent=d.mcVersion?('MC '+d.mcVersion):'';plInstalled=d.plugins||[];renderPlugins(plInstalled);}catch(e){}}
+var plInstalled=null;
+function plNorm(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function plIsInstalled(h){var s=plNorm(h.slug),t=plNorm(h.title);return (plInstalled||[]).some(function(p){var n=plNorm(p.name),f=plNorm(String(p.file).replace(/\.jar(\.disabled)?$/,''));return (n&&(n===s||n===t))||(s.length>=4&&f.indexOf(s)===0)||(t.length>=4&&f.indexOf(t)===0);});}
 function renderPlugins(list){var box=document.getElementById('pl-list');box.textContent='';
   if(!list.length){var e=document.createElement('div');e.style.cssText='text-align:center;color:var(--muted);padding:16px;font-size:13px;';e.textContent=T('ui.no_plugins');box.appendChild(e);return;}
   list.forEach(function(p){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';row.style.gap='8px';
@@ -1847,12 +1850,14 @@ function renderPlugins(list){var box=document.getElementById('pl-list');box.text
 var plPopularLoaded=false;
 function plTab(w){document.getElementById('pl-pane-installed').style.display=w==='installed'?'':'none';document.getElementById('pl-pane-browse').style.display=w==='browse'?'':'none';document.getElementById('pl-tab-installed').classList.toggle('active',w==='installed');document.getElementById('pl-tab-browse').classList.toggle('active',w==='browse');if(w==='browse'&&!plPopularLoaded)searchPlugins();}
 async function searchPlugins(){var q=document.getElementById('pl-q').value.trim(),box=document.getElementById('pl-results');document.getElementById('pl-results-title').textContent=q?'':T('ui.pl_popular');if(!q)plPopularLoaded=true;box.textContent='...';
+  if(plInstalled===null)await loadPlugins();
   try{var d=await fetch('/api/plugins/search?q='+encodeURIComponent(q)).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;});
     box.textContent='';if(!d.results.length){box.textContent=T('ui.no_results_2');return;}
     d.results.forEach(function(h){var row=document.createElement('div');row.className='backup-row';row.style.gap='8px';
       if(h.icon){var ic=document.createElement('img');ic.src=h.icon;ic.loading='lazy';ic.alt='';ic.width=36;ic.height=36;ic.style.cssText='border-radius:6px;flex:0 0 auto;object-fit:cover;';row.appendChild(ic);}var info=document.createElement('div');info.style.flex='1';info.style.minWidth='0';var n=document.createElement('div');n.className='backup-name';n.textContent=h.title;var m=document.createElement('div');m.className='backup-meta';m.textContent=h.description+' · '+h.downloads+T('ui.downloads');info.appendChild(n);info.appendChild(m);row.appendChild(info);
       var x=document.createElement('button');x.className='btn btn-primary';x.style.cssText='padding:5px 12px;font-size:12px;';x.textContent=T('ui.install');
-      x.onclick=async function(){x.disabled=true;x.textContent=T('ui.text_3');try{var r=await apiPost('/api/plugins/install',{id:h.id});toast(T('ui.installed')+r.file+T('ui.restart_the_server_to_load_it'));loadPlugins();x.textContent='✓';}catch(e){toast(e.message,'err');x.disabled=false;x.textContent=T('ui.install');}};
+      if(plIsInstalled(h)){x.disabled=true;x.className='btn btn-ghost';x.textContent='✓ '+T('ui.pl_installed_badge');}
+      x.onclick=async function(){x.disabled=true;x.textContent=T('ui.text_3');try{var r=await apiPost('/api/plugins/install',{id:h.id});toast(T('ui.installed')+r.file+T('ui.restart_the_server_to_load_it'));await loadPlugins();x.className='btn btn-ghost';x.textContent='✓ '+T('ui.pl_installed_badge');}catch(e){toast(e.message,'err');x.disabled=false;x.textContent=T('ui.install');}};
       row.appendChild(x);box.appendChild(row);});
   }catch(e){box.textContent='';toast(e.message,'err');}}
 async function loadJarVersions(){try{var d=await fetch('/api/jars/paper').then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;});document.getElementById('jar-current').textContent=d.current||'';

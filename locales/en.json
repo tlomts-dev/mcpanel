@@ -692,5 +692,6 @@
  "ui.toast_wl_off": "Disable Whitelist",
  "ui.pl_tab_installed": "Installed",
  "ui.pl_tab_browse": "Browse plugins",
- "ui.pl_popular": "Most downloaded (Modrinth)"
+ "ui.pl_popular": "Most downloaded (Modrinth)",
+ "ui.pl_installed_badge": "Installed"
 }
