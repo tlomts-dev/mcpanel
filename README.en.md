@@ -4,7 +4,7 @@
 
 A web control panel for managing a Minecraft (Paper/Spigot) server from the browser instead of logging in over SSH every time. It controls the server through a tmux session and streams the console and log live over WebSocket.
 
-Updated for the latest Minecraft release: **26.3** (runs on Java 25).
+Compatible with every Minecraft version from **1.13 up to 26.3** and newer (updated for the latest release, 26.3). The panel itself does not depend on the game version, and it reads player files in both the old and new layouts (the new `players/` folder in 26.1+ and the old `playerdata/`).
 
 The project ships as two complete editions with identical features: the Arabic interface (RTL, repository root) and the English interface (LTR, in the `en/` folder).
 
@@ -31,8 +31,8 @@ The project ships as two complete editions with identical features: the Arabic i
 
 - Linux with tmux installed
 - Node.js 18 or newer
-- Java 25 or newer (to run the Minecraft server itself; 26.x needs Java 25)
-- A ready Paper/Spigot server (tested with 26.3): the jar and the worlds already sitting in a folder on the machine
+- A Java version suitable for the Minecraft server you run (for example Java 21 for 1.21.x and Java 25 for 26.x). The panel itself only needs Node.js, not Java
+- A ready Paper/Spigot server (any version from 1.13 up, the example in `.env` is 26.3): the jar and the worlds already sitting in a folder on the machine
 
 The panel does not download or set up a Minecraft server for you, it only manages an existing one.
 
@@ -111,7 +111,7 @@ panel/
 │   └── public/index.html
 └── screenshots/        Screenshots (ar/ and en/)
 
-PanelDataLogger/         Optional companion Java plugin (separate Maven project, built against 26.3)
+PanelDataLogger/         Optional companion Java plugin (separate Maven project, one jar that runs on every version from 1.13 to the latest)
 ├── pom.xml
 ├── README.md / README.en.md
 └── src/main/...

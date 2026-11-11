@@ -255,6 +255,19 @@ async function readPlayerStats(uuid) {
     const p = playerFilePath(getWorldName(), 'stats', uuid);
     if (!fs.existsSync(p)) return null;
     const j = JSON.parse(await fsp.readFile(p, 'utf8'));
+    // Minecraft 1.12 and older use a flat "stat.xxx" file instead of the nested namespaced format
+    if (!j.stats && Object.keys(j).some(k => k.startsWith('stat.'))) {
+      const lm = k => (j['stat.' + k] || 0) / 100;
+      return {
+        deaths: j['stat.deaths'] ?? 0, playerKills: j['stat.playerKills'] ?? 0, mobKills: j['stat.mobKills'] ?? 0,
+        playTimeTicks: j['stat.playOneMinute'] ?? 0,
+        distances: {
+          walk: lm('walkOneCm'), sprint: lm('sprintOneCm'), swim: lm('swimOneCm'), fall: lm('fallOneCm'),
+          climb: lm('climbOneCm'), boat: lm('boatOneCm'), elytra: lm('aviateOneCm'), horse: lm('horseOneCm'),
+        },
+        topMined: [],
+      };
+    }
     const custom = j.stats?.['minecraft:custom'] || {};
     const mined  = j.stats?.['minecraft:mined']  || {};
     const cm = k => (custom[`minecraft:${k}`] || 0) / 100;
@@ -342,7 +355,7 @@ function buildPlayerDataResult(d, live) {
       result.durability = { current: Math.max(0, maxDur - dmg), max: maxDur };
     }
     try {
-      const trim = it.components?.['minecraft:trim'];
+      const trim = it.components?.['minecraft:trim'] || it.tag?.Trim; // 1.20.5+ component, or the older item tag
       if (trim) {
         const pattern  = (typeof trim.pattern  === 'string' ? trim.pattern  : trim.pattern?.key  || trim.pattern?.id  || '').replace('minecraft:', '');
         const material = (typeof trim.material === 'string' ? trim.material : trim.material?.key || trim.material?.id || '').replace('minecraft:', '');

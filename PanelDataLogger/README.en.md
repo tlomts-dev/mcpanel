@@ -48,7 +48,7 @@ The panel still works, but:
 
 ## Building
 
-Requires **JDK 25+** (Minecraft 26.x runs on Java 25) and Maven.
+Requires JDK 8 or newer and Maven. The resulting jar is Java 8 bytecode built against the Bukkit 1.13 API, and it runs on **every version from 1.13 up to the latest (26.x and beyond)** with no changes or rebuilds. Anything that differs between versions (statistic names, armor trims, max health...) is read through reflection with safe fallbacks.
 
 ```bash
 cd PanelDataLogger
@@ -57,7 +57,7 @@ mvn package
 
 Output: `target/PanelDataLogger.jar`
 
-> The plugin is built against `spigot-api 26.3-R0.1-SNAPSHOT`. If the download
+> The plugin is deliberately built against `spigot-api 1.13.2-R0.1-SNAPSHOT` so it is not tied to one version. If the download
 > fails, change `<spigot.api.version>` in `pom.xml` to match the jar you built
 > with BuildTools (it is usually already in your local `~/.m2`).
 

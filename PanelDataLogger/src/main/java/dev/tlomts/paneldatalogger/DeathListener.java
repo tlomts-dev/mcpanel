@@ -48,10 +48,10 @@ public class DeathListener implements Listener {
 
         EntityDamageEvent.DamageCause causeEnum = last.getCause();
 
-        if (last instanceof EntityDamageByEntityEvent byEntity) {
-            Entity damager = byEntity.getDamager();
-            if (damager instanceof Player p) {
-                return causeEnum.name() + ":PLAYER:" + p.getName();
+        if (last instanceof EntityDamageByEntityEvent) {
+            Entity damager = ((EntityDamageByEntityEvent) last).getDamager();
+            if (damager instanceof Player) {
+                return causeEnum.name() + ":PLAYER:" + ((Player) damager).getName();
             } else if (damager != null) {
                 return causeEnum.name() + ":MOB:" + damager.getType().name();
             }
