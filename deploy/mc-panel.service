@@ -1,0 +1,19 @@
+# Install:  sudo cp deploy/mc-panel.service /etc/systemd/system/ && sudo systemctl enable --now mc-panel
+# Adjust User, WorkingDirectory and the node path. Keep the user that owns the Minecraft folder.
+[Unit]
+Description=MC Panel
+After=network.target
+
+[Service]
+Type=simple
+User=minecraft
+WorkingDirectory=/opt/mc-panel
+EnvironmentFile=/opt/mc-panel/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

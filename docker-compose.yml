@@ -1,0 +1,16 @@
+# Quick start:  cp .env.example .env  (set ADMIN_PASS and SESSION_SECRET)  then  docker compose up -d
+services:
+  panel:
+    build: .
+    # command: ["node", "en/server.js"]   # uncomment for the English edition
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MC_DIR: /data
+      TMUX_SESSION: mcserver
+    ports:
+      - "8080:8080"      # panel (put HTTPS in front of it, see deploy/Caddyfile)
+      - "25565:25565"    # Minecraft
+    volumes:
+      - ./data:/data     # worlds, jar, backups, panel settings; survives container rebuilds
+    mem_limit: 4g        # raise it together with the server's Xmx

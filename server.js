@@ -43,8 +43,20 @@ const MC_LOG_FILE  = path.join(SERVER_DIR, '.mc-panel.log');
 
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_HASH = process.env.ADMIN_HASH || bcrypt.hashSync(process.env.ADMIN_PASS, 12);
-const USERS = { [ADMIN_USER]: ADMIN_HASH };
 if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+const { createAuth, levelFor } = require('./lib/auth');
+const auth = createAuth({ dir: SERVER_DIR, ownerUser: ADMIN_USER, ownerHash: ADMIN_HASH, t: {
+  badUser: 'اسم المستخدم 3-32 حرفاً (أحرف إنجليزية وأرقام و _ . -)',
+  reservedUser: 'هذا الاسم محجوز للمالك',
+  badRole: 'دور غير صالح',
+  badPassword: 'كلمة المرور 8 أحرف على الأقل',
+  userExists: 'المستخدم موجود',
+  tooMany: 'وصلت للحد الأقصى من المستخدمين',
+  userNotFound: 'المستخدم غير موجود',
+  badCode: 'رمز التحقق غير صحيح',
+  ownerPwEnv: 'كلمة مرور المالك تُغيَّر من ملف .env',
+  wrongPassword: 'كلمة المرور الحالية خاطئة',
+} });
 
 // ── Validation ────────────────────────────────────────────────────────────────
 const PLAYER_RE     = /^\.?[a-zA-Z0-9_]{1,16}$/;
@@ -86,21 +98,22 @@ function rateLimit(req, res, next) {
 // ── Express setup ─────────────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
-const wss    = new WebSocketServer({ server });
+const wss    = new WebSocketServer({ noServer: true });
 
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '4mb' }));
 app.use(express.urlencoded({ extended: false }));
-app.use(session({
+const sessionMw = session({
   secret: SESSION_SEC,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 86400000, httpOnly: true, sameSite: 'strict' },
-}));
+  cookie: { maxAge: 86400000, httpOnly: true, sameSite: 'strict', secure: process.env.COOKIE_SECURE === 'true' ? true : process.env.COOKIE_SECURE === 'auto' ? 'auto' : false },
+});
+app.use(sessionMw);
 app.use(express.static(path.join(__dirname, 'public')));
 
 function requireAuth(req, res, next) {
-  if (req.session?.user) return next();
+  if (req.session?.user && auth.roleOf(req.session.user)) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
 
@@ -570,6 +583,7 @@ function parseLogLine(line) {
       return { name, display: name };
     }).filter(p => p.name && PLAYER_RE.test(p.name));
     syncOnlineFromList(players.map(p => p.name));
+    live.players = players.length;
     broadcast({ type: 'players', list: players });
     return true; // رد أمر list الداخلي، يبقى مخفي عن الكونسول
   }
@@ -671,6 +685,7 @@ function startTmuxMonitor() {
     lastCpu         = null;
     cpuSample       = null;
     serverReady     = false;
+    if (!intentionalStop && !restartPending) monitor.event('crash', 'توقف السيرفر بشكل غير متوقع. تتم إعادة التشغيل تلقائياً.');
 
     // نظام التشغيل التلقائي إذا كان الإيقاف غير متعمد أو أمر ريستارت
     if (restartPending || !intentionalStop) {
@@ -752,6 +767,7 @@ function startMC() {
   startTmuxMonitor();
 
   broadcast({ type: 'status', running: true });
+  monitor.event('started', 'تم تشغيل السيرفر.');
   return true;
 }
 
@@ -759,21 +775,73 @@ function startMC() {
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.post('/api/login', rateLimit, (req, res) => {
-  const { username, password } = req.body;
-  const hash  = username && USERS[username];
-  const valid = hash
-    ? bcrypt.compareSync(String(password), hash)
-    : (bcrypt.compareSync('dummy', '$2a$12$dummyhash..............................'), false);
-  if (!valid) return res.status(401).json({ error: 'بيانات خاطئة' });
+  const { username, password } = req.body || {};
+  const who = auth.verify(username, password);
+  if (!who) {
+    auth.audit(String(username || '').slice(0, 32), req.ip, 'LOGIN_FAILED', '');
+    return res.status(401).json({ error: 'بيانات خاطئة' });
+  }
+  if (auth.twoFa.enabled(who.username) && !auth.twoFa.check(who.username, (req.body || {}).code)) {
+    auth.audit(who.username, req.ip, 'LOGIN_2FA_FAILED', '');
+    return res.status(401).json({ error: (req.body || {}).code ? 'رمز التحقق غير صحيح' : 'أدخل رمز التحقق الثنائي', needCode: true });
+  }
   loginAttempts.delete(req.ip);
   req.session.regenerate(err => {
     if (err) return res.status(500).json({ error: 'Session error' });
-    req.session.user = username;
-    res.json({ success: true });
+    req.session.user = who.username;
+    auth.audit(who.username, req.ip, 'LOGIN', who.role);
+    res.json({ success: true, role: who.role });
   });
 });
 
-app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ success: true })));
+app.post('/api/logout', (req, res) => { auth.audit(req.session && req.session.user, req.ip, 'LOGOUT', ''); req.session.destroy(() => res.json({ success: true })); });
+
+// ── Roles: every /api route below needs a minimum role (see lib/auth.js) ──────
+app.use('/api', (req, res, next) => {
+  const user = req.session && req.session.user, role = user && auth.roleOf(user);
+  if (!role) return res.status(401).json({ error: 'Unauthorized' });
+  if (auth.ROLES[role] < levelFor(req.method, req.path)) {
+    auth.audit(user, req.ip, 'DENIED ' + req.method + ' ' + req.path, '');
+    return res.status(403).json({ error: 'ليست لديك صلاحية لهذا الإجراء' });
+  }
+  req.user = user; req.role = role;
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) auth.audit(user, req.ip, req.method + ' ' + req.originalUrl.split('?')[0], auth.describeBody(req.body));
+    });
+  }
+  next();
+});
+
+app.get('/api/me', (req, res) => res.json({ username: req.user, role: req.role, level: auth.ROLES[req.role], twoFa: auth.twoFa.enabled(req.user) }));
+app.post('/api/me/password', (req, res) => {
+  const r = auth.changeOwnPassword(req.user, (req.body || {}).current, (req.body || {}).newPassword);
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
+});
+app.post('/api/me/2fa/begin', (req, res) => res.json(auth.twoFa.begin(req.user)));
+app.post('/api/me/2fa/confirm', (req, res) => {
+  const r = auth.twoFa.confirm(req.user, (req.body || {}).code);
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
+});
+app.post('/api/me/2fa/disable', (req, res) => {
+  const b = req.body || {}, r = auth.twoFa.disable(req.user, b.password, b.code);
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
+});
+app.get('/api/users', (_req, res) => res.json({ users: auth.list() }));
+app.post('/api/users', (req, res) => {
+  const b = req.body || {}, r = auth.add(String(b.username || ''), b.password, b.role);
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
+});
+app.post('/api/users/update', (req, res) => {
+  const b = req.body || {}, r = auth.update(String(b.username || ''), { role: b.role, password: b.password });
+  if (!r.error && b.resetTotp) auth.twoFa.reset(String(b.username));
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true });
+});
+app.post('/api/users/delete', (req, res) => {
+  const r = auth.remove(String((req.body || {}).username || ''));
+  r.error ? res.status(404).json({ error: r.error }) : res.json({ success: true });
+});
+app.get('/api/audit', (_req, res) => res.json({ entries: auth.readAudit(200) }));
 
 app.get('/api/status', requireAuth, (_req, res) => res.json({
   running: isRunning(),
@@ -815,6 +883,7 @@ app.post('/api/restart', requireAuth, (_req, res) => {
 
 app.post('/api/command', requireAuth, (req, res) => {
   const cmd = sanitizeCommand(req.body.command);
+  if (cmd && !auth.commandAllowed(req.role, cmd)) return res.status(403).json({ error: 'هذا الأمر غير مسموح لدورك' });
   if (!cmd)         return res.status(400).json({ error: 'أمر غير صالح' });
   if (!isRunning()) return res.status(409).json({ error: 'السيرفر متوقف' });
   sendCommand(cmd);
@@ -846,6 +915,22 @@ app.get('/api/info', requireAuth, async (_req, res) => {
   });
 });
 
+// ── Timed bans ───────────────────────────────────────────────────────────────
+const { createTempBans } = require('./lib/tempbans');
+const tempBans = createTempBans({ dir: SERVER_DIR, isRunning, pardon: n => sendCommand(`pardon ${n}`) });
+app.post('/api/player/tempban', (req, res) => {
+  const b = req.body || {}, p = sanitizePlayer(b.player);
+  if (!p) return res.status(400).json({ error: 'اسم لاعب غير صالح' });
+  const minutes = parseInt(b.minutes, 10) || 0;
+  if (minutes < 0 || minutes > 525600) return res.status(400).json({ error: 'مدة غير صالحة' });
+  const raw = String(b.reason || '').trim().slice(0, 100), reason = raw ? sanitizeCommand(raw) : '';
+  if (raw && !reason) return res.status(400).json({ error: 'سبب غير صالح' });
+  if (!isRunning()) return res.status(409).json({ error: 'السيرفر متوقف' });
+  sendCommand('ban ' + p + (reason ? ' ' + reason : ''));
+  minutes > 0 ? tempBans.add(p, minutes) : tempBans.remove(p);
+  res.json({ success: true });
+});
+
 // ── Player actions ────────────────────────────────────────────────────────────
 const PLAYER_ACTIONS = {
   op:    p => `op ${p}`,
@@ -866,6 +951,7 @@ Object.entries(PLAYER_ACTIONS).forEach(([action, fn]) => {
     if (!p)           return res.status(400).json({ error: 'اسم لاعب غير صالح' });
     if (!isRunning()) return res.status(409).json({ error: 'السيرفر متوقف' });
     sendCommand(fn(p));
+    if (action === 'ban' || action === 'pardon') tempBans.remove(p);
     res.json({ success: true });
   });
 });
@@ -885,7 +971,8 @@ app.get('/api/ops',       requireAuth, async (_req, res) => {
 });
 app.get('/api/bans',      requireAuth, async (_req, res) => {
   const bans = await readJsonFile('banned-players.json');
-  res.json({ bans: bans.map(b => ({ name: b.name, reason: b.reason, created: b.created })) });
+  const timed = tempBans.list();
+  res.json({ bans: bans.map(b => ({ name: b.name, reason: b.reason, created: b.created, expires: timed[b.name] || null })) });
 });
 app.get('/api/whitelist', requireAuth, async (_req, res) => {
   const list = await readJsonFile('whitelist.json');
@@ -1112,6 +1199,244 @@ app.post('/api/files/rename', requireAuth, async (req, res) => {
   } catch { res.status(500).json({ error: 'فشل إعادة التسمية' }); }
 });
 
+// ── Monitoring history + alerts ──────────────────────────────────────────────
+const { createMonitor } = require('./lib/monitor');
+const monitor = createMonitor({
+  dir: SERVER_DIR,
+  serverName: process.env.SERVER_NAME || path.basename(SERVER_DIR) || 'Minecraft',
+  log: line => broadcast({ type: 'log', data: line }),
+});
+const live = { ram: null, ramMax: null, players: 0 };
+const diskCache = { at: 0, freeGB: null };
+function diskFreeGB() {
+  if (Date.now() - diskCache.at > 5 * 60000) {
+    diskCache.at = Date.now();
+    try {
+      const df = execSync(`df -k "${SERVER_DIR}" 2>/dev/null`).toString().split('\n')[1];
+      if (df) diskCache.freeGB = monitor.diskFreeGB(parseInt(df.trim().split(/\s+/)[3]) * 1024);
+    } catch {}
+  }
+  return diskCache.freeGB;
+}
+setInterval(() => {
+  const running = isRunning();
+  monitor.sample({ running, tps: running ? lastTps : null, ram: running ? live.ram : null, ramMax: live.ramMax,
+    cpu: running ? lastCpu : null, players: running ? live.players : 0, disk: diskFreeGB() });
+}, 60000).unref();
+setInterval(() => monitor.flush(), 5 * 60000).unref();
+
+app.get('/api/monitor/history', (_req, res) => res.json(monitor.history()));
+app.get('/api/alerts', (_req, res) => res.json(monitor.getConfig()));
+app.post('/api/alerts', (req, res) => {
+  const r = monitor.setConfig(req.body || {});
+  if (r.error) return res.status(400).json({ error: r.error === 'discord' ? 'رابط Discord webhook غير صالح' : 'بيانات Telegram غير صالحة' });
+  res.json({ success: true });
+});
+app.post('/api/alerts/test', async (_req, res) => {
+  const c = monitor.getConfig();
+  if (!c.hasDiscord && !c.hasTelegram) return res.status(400).json({ error: 'لم تضبط قناة تنبيه (Discord أو Telegram) بعد' });
+  const failed = await monitor.test();
+  failed.length ? res.status(502).json({ error: 'فشل الإرسال' + ': ' + failed.join('; ') }) : res.json({ success: true });
+});
+
+// ── Off-site backup copies (rclone) ──────────────────────────────────────────
+const { createOffsite } = require('./lib/offsite');
+const offsite = createOffsite({ dir: SERVER_DIR });
+app.get('/api/backups/offsite', (_req, res) => res.json(offsite.get()));
+app.post('/api/backups/offsite', (req, res) => {
+  const r = offsite.set(req.body || {});
+  r.error ? res.status(400).json({ error: 'صيغة الوجهة غير صالحة (مثال: myremote:minecraft)' }) : res.json({ success: true });
+});
+app.post('/api/backups/offsite/test', async (_req, res) => {
+  if (!offsite.get().remote) return res.status(400).json({ error: 'أدخل وجهة أولاً' });
+  try { await offsite.test(); res.json({ success: true }); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// ── Plugin manager (Modrinth) and Paper jar download ─────────────────────────
+const downloads = require('./lib/downloads').createDownloads();
+const PLUGINS_DIR = path.join(SERVER_DIR, 'plugins');
+const PLUGIN_FILE_RE = /^[\w.+ -]{1,120}\.jar(\.disabled)?$/;
+const DL_ERRORS = {
+  'no compatible version': 'لا توجد نسخة متوافقة مع إصدار سيرفرك', 'checksum mismatch': 'فشل التحقق من سلامة الملف (checksum)',
+  'file too large': 'الملف كبير جداً', 'blocked host': 'مصدر غير مسموح', 'bad file name': 'اسم ملف غير صالح',
+  'bad project': 'معرّف غير صالح', 'bad version': 'إصدار غير صالح', 'no file': 'لا يوجد ملف للتنزيل', 'no download': 'لا يوجد تنزيل لهذا الإصدار',
+};
+const dlError = e => DL_ERRORS[e && e.message] || (e && e.message) || 'فشلت العملية';
+const mcVersionOnly = () => ((serverVersion || '').match(/\d+\.\d+(?:\.\d+)?/) || [null])[0];
+
+async function pluginMeta(full) {
+  try {
+    const dir = await unzipper.Open.file(full);
+    const e = dir.files.find(x => x.path === 'paper-plugin.yml') || dir.files.find(x => x.path === 'plugin.yml');
+    if (!e) return {};
+    const txt = (await e.buffer()).toString('utf8');
+    const g = k => { const m = new RegExp('^' + k + ':\\s*[\'"]?([^\'"\\r\\n]+)', 'm').exec(txt); return m ? m[1].trim() : null; };
+    return { name: g('name'), version: g('version') };
+  } catch { return {}; }
+}
+
+app.get('/api/plugins', async (_req, res) => {
+  try {
+    const files = (await fsp.readdir(PLUGINS_DIR)).filter(f => PLUGIN_FILE_RE.test(f)).slice(0, 300);
+    const out = [];
+    for (const f of files) {
+      const full = path.join(PLUGINS_DIR, f), st = await fsp.stat(full);
+      out.push({ file: f, enabled: !f.endsWith('.disabled'), size: st.size, date: st.mtimeMs, ...(await pluginMeta(full)) });
+    }
+    out.sort((a, b) => (a.name || a.file).toLowerCase().localeCompare((b.name || b.file).toLowerCase()));
+    res.json({ plugins: out, mcVersion: mcVersionOnly() });
+  } catch { res.json({ plugins: [], mcVersion: mcVersionOnly() }); }
+});
+
+function pluginPath(name) {
+  const f = String(name || '');
+  return PLUGIN_FILE_RE.test(f) ? path.join(PLUGINS_DIR, f) : null;
+}
+app.post('/api/plugins/toggle', async (req, res) => {
+  const p = pluginPath((req.body || {}).file);
+  if (!p) return res.status(400).json({ error: 'اسم ملف غير صالح' });
+  try {
+    const to = p.endsWith('.disabled') ? p.slice(0, -'.disabled'.length) : p + '.disabled';
+    await fsp.rename(p, to);
+    res.json({ success: true });
+  } catch { res.status(404).json({ error: 'الملف غير موجود' }); }
+});
+app.post('/api/plugins/delete', async (req, res) => {
+  const p = pluginPath((req.body || {}).file);
+  if (!p) return res.status(400).json({ error: 'اسم ملف غير صالح' });
+  try { await fsp.unlink(p); res.json({ success: true }); }
+  catch { res.status(404).json({ error: 'الملف غير موجود' }); }
+});
+app.get('/api/plugins/search', async (req, res) => {
+  try { res.json({ results: await downloads.searchPlugins(req.query.q, mcVersionOnly()) }); }
+  catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+app.post('/api/plugins/install', async (req, res) => {
+  try { res.json({ success: true, ...(await downloads.installPlugin((req.body || {}).id, mcVersionOnly(), PLUGINS_DIR)) }); }
+  catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+app.get('/api/jars/paper', async (_req, res) => {
+  try { res.json({ versions: await downloads.paperVersions(), current: SERVER_JAR }); }
+  catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+app.post('/api/jars/paper', async (req, res) => {
+  const b = req.body || {};
+  try {
+    const r = await downloads.downloadPaper(b.version, SERVER_DIR);
+    if (b.eula === true) {
+      await fsp.writeFile(path.join(SERVER_DIR, 'eula.txt'), '# Accepted by the panel user (https://aka.ms/MinecraftEULA)\neula=true\n');
+      broadcast({ type: 'log', data: '[Panel] تم تسجيل قبول EULA بطلبك' + '\n' });
+    }
+    res.json({ success: true, ...r });
+  } catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+
+// ── Backup helper (used by the API and by the scheduler) ─────────────────────
+let backupBusy = false;
+async function pruneBackups(keep) {
+  if (!keep) return 0;
+  const files = (await fsp.readdir(BACKUPS_DIR)).filter(f => /^backup-.*\.zip$/.test(f));
+  const withTime = await Promise.all(files.map(async f => ({ f, m: (await fsp.stat(path.join(BACKUPS_DIR, f))).mtimeMs })));
+  withTime.sort((a, b) => b.m - a.m);
+  const old = withTime.slice(keep);
+  for (const o of old) await fsp.unlink(path.join(BACKUPS_DIR, o.f)).catch(() => {});
+  return old.length;
+}
+
+async function createBackup(keep = 0) {
+  if (backupBusy) throw new Error('__BUSY__');
+  backupBusy = true;
+  const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const name  = `backup-${stamp}.zip`;
+  const out   = path.join(BACKUPS_DIR, name);
+  const wasRunning = isRunning();
+  try {
+    // flush the world to disk and pause autosave so the archive is consistent
+    if (wasRunning) { sendCommand('save-off'); sendCommand('save-all flush'); await new Promise(r => setTimeout(r, 3000)); }
+    const output  = fs.createWriteStream(out);
+    const archive = new archiver.ZipArchive({ zlib: { level: 6 } });
+    archive.pipe(output);
+    for (const w of ['world', 'world_nether', 'world_the_end']) {
+      const p = path.join(SERVER_DIR, w);
+      if (fs.existsSync(p)) archive.directory(p, w);
+    }
+    for (const c of ['server.properties', 'ops.json', 'whitelist.json', 'banned-players.json', 'banned-ips.json']) {
+      const p = path.join(SERVER_DIR, c);
+      if (fs.existsSync(p)) archive.file(p, { name: c });
+    }
+    await new Promise((resolve, reject) => { output.on('close', resolve); archive.on('error', reject); archive.finalize(); });
+    const removed = await pruneBackups(keep);
+    let uploaded = false;
+    if (offsite.enabled()) {
+      try { await offsite.upload(out); uploaded = true; broadcast({ type: 'log', data: '[Panel] رُفعت النسخة إلى الوجهة الخارجية: ' + name + '\n' }); }
+      catch (e) { broadcast({ type: 'log', data: '[Panel] فشل رفع النسخة الخارجي: ' + e.message + '\n' }); }
+    }
+    return { name, removed, uploaded };
+  } finally {
+    if (wasRunning && isRunning()) sendCommand('save-on');
+    backupBusy = false;
+  }
+}
+
+// ── Restart with an in-game countdown ────────────────────────────────────────
+let countdownActive = false;
+function restartWithCountdown(warn) {
+  return new Promise(resolve => {
+    if (!isRunning()) { intentionalStop = false; startMC(); return resolve(true); }
+    if (countdownActive) return resolve(false);
+    countdownActive = true;
+    const marks = [...new Set([warn, 30, 10, 5, 3, 2, 1])].filter(s => s > 0 && s <= warn);
+    for (const s of marks) {
+      setTimeout(() => { if (isRunning()) sendCommand(`say Server restarting in ${s} second${s === 1 ? '' : 's'}`); }, (warn - s) * 1000);
+    }
+    setTimeout(() => {
+      countdownActive = false;
+      if (isRunning()) { restartPending = true; intentionalStop = false; sendCommand('stop'); }
+    }, warn * 1000);
+    resolve(true); // the countdown continues in the background; don't hold the HTTP request open
+  });
+}
+
+// ── Scheduler ────────────────────────────────────────────────────────────────
+const { createScheduler } = require('./lib/scheduler');
+const scheduler = createScheduler({
+  file: path.join(SERVER_DIR, '.panel-schedule.json'),
+  sanitizeCommand,
+  log: line => broadcast({ type: 'log', data: line }),
+  actions: {
+    isRunning,
+    command: sendCommand,
+    backup: keep => createBackup(keep),
+    restart: warn => restartWithCountdown(warn),
+  },
+  t: {
+    badType: 'نوع المهمة غير صالح', badCron: 'جدول cron غير صالح', badArg: 'النص أو الأمر غير صالح', tooMany: 'وصلت للحد الأقصى من المهام (50)', notFound: 'المهمة غير موجودة',
+    alreadyRunning: 'المهمة تعمل الآن', skippedBusy: 'تخطي: إعادة تشغيل جارية', skippedStopped: 'تخطي: السيرفر متوقف',
+    ranBackup: (n, b, r) => `[Panel] مهمة مجدولة "${n}": نسخة ${b}${r ? ` (حُذف ${r} قديمة)` : ''}\n`,
+    ranRestart: (n, w) => `[Panel] مهمة مجدولة "${n}": إعادة تشغيل بعد ${w} ثانية\n`,
+    ranGeneric: n => `[Panel] مهمة مجدولة "${n}" نُفّذت\n`,
+    failed: (n, e) => `[Panel] فشلت المهمة "${n}": ${e}\n`,
+  },
+});
+
+app.get('/api/schedule', requireAuth, (_req, res) => res.json({ tasks: scheduler.list() }));
+app.post('/api/schedule', requireAuth, (req, res) => {
+  const r = scheduler.add(req.body || {});
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true, task: r.task });
+});
+app.post('/api/schedule/update', requireAuth, (req, res) => {
+  const r = scheduler.update(String((req.body || {}).id || ''), req.body || {});
+  r.error ? res.status(400).json({ error: r.error }) : res.json({ success: true, task: r.task });
+});
+app.post('/api/schedule/delete', requireAuth, (req, res) => {
+  scheduler.remove(String((req.body || {}).id || '')) ? res.json({ success: true }) : res.status(404).json({ error: 'المهمة غير موجودة' });
+});
+app.post('/api/schedule/run', requireAuth, async (req, res) => {
+  const status = await scheduler.runNow(String((req.body || {}).id || ''));
+  status === null ? res.status(404).json({ error: 'المهمة غير موجودة' }) : res.json({ success: true, status });
+});
+
 // ── Backups API ───────────────────────────────────────────────────────────────
 app.get('/api/backups', requireAuth, async (_req, res) => {
   try {
@@ -1129,24 +1454,12 @@ app.get('/api/backups', requireAuth, async (_req, res) => {
 });
 
 app.post('/api/backups/create', requireAuth, async (_req, res) => {
-  const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  const name  = `backup-${stamp}.zip`;
-  const out   = path.join(BACKUPS_DIR, name);
   try {
-    const output  = fs.createWriteStream(out);
-    const archive = new archiver.ZipArchive({ zlib: { level: 6 } });
-    archive.pipe(output);
-    for (const w of ['world', 'world_nether', 'world_the_end']) {
-      const p = path.join(SERVER_DIR, w);
-      if (fs.existsSync(p)) archive.directory(p, w);
-    }
-    for (const c of ['server.properties', 'ops.json', 'whitelist.json', 'banned-players.json', 'banned-ips.json']) {
-      const p = path.join(SERVER_DIR, c);
-      if (fs.existsSync(p)) archive.file(p, { name: c });
-    }
-    await new Promise((resolve, reject) => { output.on('close', resolve); archive.on('error', reject); archive.finalize(); });
+    const { name } = await createBackup(0);
     res.json({ success: true, name });
-  } catch { res.status(500).json({ error: 'فشل إنشاء النسخة' }); }
+  } catch (e) {
+    res.status(e.message === '__BUSY__' ? 409 : 500).json({ error: 'فشل إنشاء النسخة' });
+  }
 });
 
 app.post('/api/backups/restore', requireAuth, async (req, res) => {
@@ -1252,7 +1565,16 @@ app.post('/api/settings/startup', requireAuth, async (req, res) => {
   } catch { res.status(500).json({ error: 'فشل الحفظ' }); }
 });
 
-// ── WebSocket ─────────────────────────────────────────────────────────────────
+// ── WebSocket (session required) ─────────────────────────────────────────────
+server.on('upgrade', (req, socket, head) => {
+  sessionMw(req, {}, () => {
+    if (!req.session || !auth.roleOf(req.session.user)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      return socket.destroy();
+    }
+    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+  });
+});
 wss.on('connection', ws => {
   if (logBuffer.length) ws.send(JSON.stringify({ type: 'log', data: logBuffer.join('') }));
 
@@ -1325,6 +1647,7 @@ setInterval(async () => {
         const ramUsedMB = Math.round(parseInt(rssMatch[1]) / 1024);
         const cfg       = loadStartupCfg();
         const ramMaxMB  = cfg.xmx.endsWith('G') ? parseInt(cfg.xmx) * 1024 : parseInt(cfg.xmx);
+        live.ram = ramUsedMB; live.ramMax = ramMaxMB;
         broadcast({ type: 'stats', ramUsed: ramUsedMB, ramMax: ramMaxMB, tps: lastTps, cpu: lastCpu, cores: CPU_CORES });
       }
     }

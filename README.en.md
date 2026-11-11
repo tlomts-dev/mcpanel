@@ -17,7 +17,16 @@ The project ships as two complete editions with identical features: the Arabic i
 - Player management: op, deop, ban, kick, pardon
 - View the operators (ops), banned players and whitelist lists
 - Full file manager: browse, open and edit, upload, download, delete. Access is confined to the server folder
-- Backups: create (worlds + server.properties + ops/whitelist/bans), restore, delete, download
+- Backups: create (worlds + server.properties + ops/whitelist/bans), restore, delete, download. The archive is taken after `save-all flush` with autosave paused, so the world is consistent
+- **Multiple users with roles** (viewer / moderator / admin / owner) managed from Settings. The role is enforced on the server for every request and takes effect immediately when changed or when the user is deleted. Moderators get a limited command list (say, tp, kick, ban, gamemode...). The owner is the `.env` account and cannot be deleted. An **activity log** records sign-ins, commands, file, backup, settings and user changes, plus failed and denied attempts (never passwords or file contents). The WebSocket connection now requires a signed-in session as well
+- **History charts** for TPS, memory, CPU, players and free disk over the last 24 hours (one point per minute, kept in `.panel-history.json`), drawn without any chart library
+- **Alerts** to Discord and Telegram: unexpected stop, start, low TPS, high memory, low disk, with a cooldown between repeats. The Discord URL is restricted to discord.com hosts and keys are never returned in full by the API
+- **Off-site backups** through rclone (S3, SFTP, Google Drive and more) for every manual or scheduled backup
+- **Two-factor authentication (TOTP)** per account (Google Authenticator, Authy...), with replay protection, plus a `COOKIE_SECURE` option for deployments behind HTTPS
+- **Plugin manager**: list installed plugins (name and version read from `plugin.yml`), enable/disable/delete, and **search and install from Modrinth** with a version compatible with your server and hash verification before the file is kept
+- **Official Paper download** (any version) with checksum verification, and `eula=true` is written only if you explicitly accept
+- **Timed bans** with length and reason: the ban is lifted automatically when time is up (even across panel restarts)
+- **Scheduled tasks** that run on the server even when the page is closed (cron syntax): backups that keep the last N, restarts with an in-game countdown, commands and broadcasts. Stored in `.panel-schedule.json`, no new dependencies and negligible memory
 - Edit server.properties and memory/JVM settings (Xms, Xmx, G1GC, extra flags) straight from the UI
 - Single-user login, bcrypt-hashed password, with a limit on failed attempts
 - Dark and light themes
@@ -86,6 +95,9 @@ pm2 save
 | `ADMIN_USER` | Login username | `admin` |
 | `ADMIN_PASS` | Password, plain text | - |
 | `ADMIN_HASH` | Ready-made bcrypt hash used instead of `ADMIN_PASS` when present | - |
+| `SERVER_NAME` | Name shown in alert messages | name of the `MC_DIR` folder |
+| `COOKIE_SECURE` | `true` or `auto` to send the session cookie over HTTPS only (use `auto` behind Caddy/nginx) | off |
+| `RCLONE_BIN` | Path to the rclone binary for off-site backups | `rclone` |
 
 Generate a `SESSION_SECRET`:
 ```bash
@@ -102,6 +114,16 @@ node -e "console.log(require('bcryptjs').hashSync('your-password-here', 12))"
 ```
 panel/
 ├── server.js          Express + WebSocket server with the whole API (Arabic edition)
+├── lib/scheduler.js    Scheduler engine (shared by both editions)
+├── lib/auth.js         Users, roles and activity log (shared)
+├── lib/monitor.js      History and alerts (shared)
+├── lib/offsite.js      Off-site backups through rclone
+├── lib/totp.js         TOTP two-factor (RFC 6238)
+├── lib/downloads.js    Modrinth and Paper downloads (fixed hosts, hash checks)
+├── lib/tempbans.js     Timed bans
+├── test/               Automated tests (`npm test`)
+├── Dockerfile, docker-compose.yml
+├── deploy/             systemd, Caddy and nginx
 ├── package.json
 ├── .env.example
 ├── public/
@@ -185,6 +207,23 @@ Full details in `PanelDataLogger/README.en.md`.
 **Light theme**
 
 ![Light theme](screenshots/en/overview-light.png)
+
+## Deployment
+
+**Docker** (I could not build the image here because Docker is not installed on my machine, so try it before relying on it):
+
+```bash
+cp .env.example .env     # set ADMIN_PASS and SESSION_SECRET
+docker compose up -d     # panel and Java in one container, data in ./data
+```
+
+The panel controls the server through tmux, so the panel and the server run in the same container. To run several servers, run one copy of the service per server with different ports and data folders.
+
+**systemd**: copy `deploy/mc-panel.service` to `/etc/systemd/system/` and adjust the user and paths. **HTTPS**: ready templates in `deploy/Caddyfile` and `deploy/nginx.conf`; set `COOKIE_SECURE=auto` in `.env`.
+
+**Tests**: `npm test` (GitHub Actions runs them on Node 18/20/22).
+
+**Limits of this release**: the panel manages a single server (for a network, run one panel per server), Velocity/BungeeCord are not supported as a server type, and the Arabic and English editions are still two separate files (the new shared logic lives in `lib/`).
 
 ## Security notes
 

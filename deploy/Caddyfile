@@ -1,0 +1,5 @@
+# HTTPS in front of the panel with automatic certificates.
+# Put COOKIE_SECURE=auto in the panel's .env so the session cookie is only sent over HTTPS.
+panel.example.com {
+	reverse_proxy 127.0.0.1:8080
+}

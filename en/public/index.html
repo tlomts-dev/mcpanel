@@ -403,6 +403,15 @@ select.sel:focus{border-color:var(--accent2);}
   .card{padding:14px;}
   .log-area{height:320px;}
 }
+body.lvl-1 .need2,body.lvl-1 .need3,body.lvl-2 .need3,body:not(.lvl-4) .need4{display:none!important}
+body.lvl-1 [data-pa],body.lvl-1 [onclick^="playerQuickAction"],body.lvl-1 [onclick^="confirmDeletePlayerData"],body.lvl-2 [onclick^="confirmDeletePlayerData"]{display:none!important}
+.hist-h{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px;}
+.hist-h b{font-family:'IBM Plex Mono',monospace;color:var(--num-color);font-weight:600;}
+.hist-svg{width:100%;height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:block;}
+.hist-svg path{fill:none;stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke;}
+.al-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:center;margin:6px 0 14px;}
+.al-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;}
+.al-row .inp{max-width:110px;padding:5px 8px;}
 </style>
 </head>
 <body>
@@ -415,6 +424,7 @@ select.sel:focus{border-color:var(--accent2);}
     <input type="text" id="un" placeholder="Username" autocomplete="username">
     <input type="password" id="pw" placeholder="Password" autocomplete="current-password"
            onkeydown="if(event.key==='Enter')login()">
+    <input type="text" id="tfacode" inputmode="numeric" maxlength="6" placeholder="Two-factor code (6 digits)" autocomplete="one-time-code" style="display:none;direction:ltr;" onkeydown="if(event.key==='Enter')login()">
     <button class="btn-login" id="loginBtn" onclick="login()">Log in</button>
     <div class="login-err" id="lerr"></div>
   </div>
@@ -436,6 +446,7 @@ select.sel:focus{border-color:var(--accent2);}
         <div class="status-dot" id="sdot"></div>
         <span id="stxt" style="font-family:'IBM Plex Mono',monospace;font-size:11px;">Stopped</span>
       </div>
+      <span id="whoami" style="font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span>
       <button class="btn-sm" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
       <button class="btn-sm" onclick="logout()">Log out</button>
     </div>
@@ -448,9 +459,10 @@ select.sel:focus{border-color:var(--accent2);}
       👥 Players
       <span class="tab-badge" id="players-badge">0</span>
     </div>
-    <div class="nav-tab" onclick="showPage('files')">📁 Files</div>
-    <div class="nav-tab" onclick="showPage('backups')">💾 Backups</div>
-    <div class="nav-tab" onclick="showPage('settings')">⚙️ Settings</div>
+    <div class="nav-tab need3" onclick="showPage('files')">📁 Files</div>
+    <div class="nav-tab need3" onclick="showPage('backups')">💾 Backups</div>
+    <div class="nav-tab need3" onclick="showPage('settings')">⚙️ Settings</div>
+    <div class="nav-tab" onclick="showPage('account')">👤 Account</div>
   </nav>
 
   <div class="ws-warn" id="wsWarn">⚠ Lost connection to the server — Retrying...</div>
@@ -523,7 +535,7 @@ select.sel:focus{border-color:var(--accent2);}
       </div>
 
       <div class="grid2">
-        <div class="card">
+        <div class="card need3">
           <div class="card-title" style="margin-bottom:14px;">Server control</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <button class="btn btn-primary btn-full" id="bstart" onclick="startServer()">▶ Start</button>
@@ -564,6 +576,23 @@ select.sel:focus{border-color:var(--accent2);}
         <div class="card-header"><div class="card-title">Recent log</div></div>
         <div class="log-area" id="mini-log" style="height:180px;"></div>
       </div>
+    
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">History</div>
+          <select class="inp" id="hist-range" onchange="drawHistory()" style="max-width:130px;padding:5px 8px;font-size:12px;">
+            <option value="60">1 hour</option><option value="360">6 hours</option><option value="1440" selected>24 hours</option>
+          </select>
+        </div>
+        <div class="grid2" id="hist-grid">
+          <div><div class="hist-h"><span>TPS</span><b id="hv-tps"></b></div><svg class="hist-svg" id="hc-tps" viewBox="0 0 300 70" preserveAspectRatio="none"></svg></div>
+          <div><div class="hist-h"><span>Players</span><b id="hv-players"></b></div><svg class="hist-svg" id="hc-players" viewBox="0 0 300 70" preserveAspectRatio="none"></svg></div>
+          <div><div class="hist-h"><span>Memory (MB)</span><b id="hv-ram"></b></div><svg class="hist-svg" id="hc-ram" viewBox="0 0 300 70" preserveAspectRatio="none"></svg></div>
+          <div><div class="hist-h"><span>CPU %</span><b id="hv-cpu"></b></div><svg class="hist-svg" id="hc-cpu" viewBox="0 0 300 70" preserveAspectRatio="none"></svg></div>
+          <div><div class="hist-h"><span>Free disk (GB)</span><b id="hv-disk"></b></div><svg class="hist-svg" id="hc-disk" viewBox="0 0 300 70" preserveAspectRatio="none"></svg></div>
+        </div>
+        <div id="hist-empty" style="display:none;text-align:center;color:var(--muted);font-size:12px;padding:10px;">No data yet (one point is recorded per minute)</div>
+      </div>
     </div>
 
     <div class="page" id="page-console">
@@ -592,11 +621,11 @@ select.sel:focus{border-color:var(--accent2);}
           <div class="log-area" id="log"></div>
           <button class="scroll-to-bottom" id="scroll-btn" onclick="jumpToBottom()">↓ Jump to bottom</button>
         </div>
-        <div class="cmd-row">
+        <div class="cmd-row need2">
           <input type="text" id="cmdinput" placeholder="Server command... (↑↓ history)" maxlength="256" onkeydown="handleCmdKey(event)">
           <button id="cmdBtn" onclick="sendCmd()">Send ↵</button>
         </div>
-        <div class="cmd-hints">
+        <div class="cmd-hints need2">
           <span class="cmd-hint" onclick="fillCmd('say ')">say</span>
           <span class="cmd-hint" onclick="fillCmd('give ')">give</span>
           <span class="cmd-hint" onclick="fillCmd('tp ')">tp</span>
@@ -791,14 +820,59 @@ select.sel:focus{border-color:var(--accent2);}
         <div id="backup-list"></div>
       </div>
       <div class="card">
-        <div class="card-title" style="margin-bottom:14px;">Auto backup</div>
+        <div class="card-title" style="margin-bottom:6px;">Off-site copy (rclone)</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Copies every new backup (manual and scheduled) to S3, SFTP, Google Drive or anything else rclone supports. Set the remote up once with rclone config on the machine, then enter remote:folder here.</div>
         <div class="inp-row" style="align-items:center;">
-          <input class="inp" id="auto-backup-interval" type="number" value="60" min="5" max="1440" style="max-width:100px;">
-          <span style="font-size:13px;color:var(--muted);">min</span>
-          <button class="btn btn-primary" onclick="setAutoBackup()">Enable</button>
-          <button class="btn btn-ghost" onclick="clearAutoBackup()">Stop</button>
+          <label style="font-size:13px;white-space:nowrap;"><input type="checkbox" id="off-on"> Enable off-site copies</label>
+          <input class="inp" id="off-remote" dir="ltr" placeholder="myremote:minecraft-backups" autocomplete="off">
+          <button class="btn btn-primary" onclick="saveOffsite()">Save</button>
+          <button class="btn btn-ghost" onclick="testOffsite()">Test connection</button>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="auto-backup-status">Disabled</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Scheduled tasks</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Runs on the server even when the page is closed. Schedule uses cron syntax (minute hour day month weekday).</div>
+        <div id="sch-list"></div>
+        <div class="inp-row" style="margin-top:14px;">
+          <select class="inp" id="sch-type" onchange="schTypeChanged()" style="max-width:190px;">
+            <option value="backup">Backup</option><option value="restart">Restart</option>
+            <option value="command">Command</option><option value="broadcast">Broadcast</option>
+          </select>
+          <input class="inp" id="sch-name" maxlength="40" placeholder="Task name (optional)">
+        </div>
+        <div class="inp-row">
+          <select class="inp" id="sch-preset" onchange="schPresetChanged()" style="max-width:220px;"><option value="*/30 * * * *">Every 30 minutes</option><option value="0 * * * *">Every hour</option><option value="0 */6 * * *">Every 6 hours</option><option value="0 4 * * *">Daily at 04:00</option><option value="0 4 * * 0">Weekly, Sunday 04:00</option><option value="">Custom schedule</option></select>
+          <input class="inp" id="sch-cron" value="*/30 * * * *" dir="ltr" style="max-width:180px;font-family:'IBM Plex Mono',monospace;">
+          <input class="inp" id="sch-arg" maxlength="200" style="display:none;">
+          <input class="inp" id="sch-num" type="number" min="0" max="1000" value="7" style="max-width:240px;">
+          <button class="btn btn-primary" onclick="addSchedule()">+ Add task</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-account">
+      <div class="card" style="max-width:460px;">
+        <div class="card-title" style="margin-bottom:12px;">My account</div>
+        <div style="font-size:13px;margin-bottom:16px;"><b id="acct-name"></b> · Role: <span id="acct-role"></span></div>
+        <div class="card-title" style="margin-bottom:10px;font-size:13px;">Change password</div>
+        <div class="field"><input class="inp" id="acct-cur" type="password" autocomplete="current-password" placeholder="Current password"></div>
+        <div class="field"><input class="inp" id="acct-new" type="password" autocomplete="new-password" placeholder="New password"></div>
+        <button class="btn btn-primary" onclick="changeMyPassword()">Save</button>
+        <div class="card-title" style="margin:18px 0 8px;font-size:13px;">Two-factor authentication (2FA) <span class="badge" id="tfa-badge"></span></div>
+        <div id="tfa-off" style="display:none;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Add the key to an authenticator app (Google Authenticator, Authy, 1Password), then enter the code it shows to confirm.</div>
+          <button class="btn btn-primary" id="tfa-begin" onclick="tfaBegin()">Enable</button>
+          <div id="tfa-setup" style="display:none;margin-top:12px;">
+            <div style="font-size:12px;color:var(--muted);">Secret key:</div>
+            <div id="tfa-secret" dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:14px;margin:4px 0 10px;user-select:all;word-break:break-all;"></div>
+            <div class="inp-row"><input class="inp" id="tfa-confirm-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" dir="ltr"><button class="btn btn-primary" onclick="tfaConfirm()">Confirm</button></div>
+          </div>
+        </div>
+        <div id="tfa-on" style="display:none;">
+          <div class="inp-row"><input class="inp" id="tfa-dis-pw" type="password" placeholder="Current password" autocomplete="current-password"><input class="inp" id="tfa-dis-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" dir="ltr"><button class="btn btn-danger" onclick="tfaDisable()">Disable</button></div>
+        </div>
       </div>
     </div>
 
@@ -807,6 +881,11 @@ select.sel:focus{border-color:var(--accent2);}
         <div class="sub-tab active" data-sub="properties" onclick="showSubTab('settings','properties');loadProps()">⚙️ server.properties</div>
         <div class="sub-tab" data-sub="startup" onclick="showSubTab('settings','startup');loadStartupSettings()">🚀 JVM</div>
         <div class="sub-tab" data-sub="panel" onclick="showSubTab('settings','panel')">🎛️ Panel</div>
+        <div class="sub-tab" data-sub="alerts" onclick="showSubTab('settings','alerts');loadAlerts()">🔔 Alerts</div>
+        <div class="sub-tab" data-sub="plugins" onclick="showSubTab('settings','plugins');loadPlugins()">🧩 Plugins</div>
+        <div class="sub-tab" data-sub="jar" onclick="showSubTab('settings','jar');loadJarVersions()">⬇ Server jar</div>
+        <div class="sub-tab need4" data-sub="users" onclick="showSubTab('settings','users');loadUsers()">👥 Users</div>
+        <div class="sub-tab need4" data-sub="audit" onclick="showSubTab('settings','audit');loadAudit()">📜 Activity log</div>
       </div>
 
       <div class="sub-page active" id="settings-properties">
@@ -848,6 +927,66 @@ select.sel:focus{border-color:var(--accent2);}
             <button class="btn btn-primary" onclick="applyStartup()">💾 Save</button>
             <span style="font-size:11px;color:var(--muted);">Applied on next boot.</span>
           </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-users">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:6px;">Users and permissions</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Viewer: read-only. Moderator: + basic game commands and player management. Admin: + start/stop the server, files, backups, tasks and settings. Owner: + users and the activity log.</div>
+          <div id="users-list"></div>
+          <div class="inp-row" style="margin-top:14px;">
+            <input class="inp" id="nu-name" maxlength="32" placeholder="Username" autocomplete="off" style="max-width:180px;">
+            <input class="inp" id="nu-pass" type="password" placeholder="Password (at least 8 characters)" autocomplete="new-password">
+            <select class="inp" id="nu-role" style="max-width:140px;"><option value="viewer">Viewer</option><option value="mod">Moderator</option><option value="admin">Admin</option></select>
+            <button class="btn btn-primary" onclick="addUser()">+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-audit">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Activity log</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="loadAudit()">↻ Refresh</button></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Last 200 actions: sign-ins, commands, file, backup, settings and user changes, plus failed and denied attempts.</div>
+          <div id="audit-list" style="overflow-x:auto;"></div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-alerts">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:6px;">Alerts</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Delivered to Discord or Telegram. Keys are masked after saving.</div>
+          <div class="field"><input class="inp" id="al-discord" dir="ltr" placeholder="Discord webhook URL" autocomplete="off"></div>
+          <div class="inp-row"><input class="inp" id="al-tgtoken" dir="ltr" placeholder="Telegram bot token" autocomplete="off"><input class="inp" id="al-tgchat" dir="ltr" placeholder="Telegram chat id" autocomplete="off"></div>
+          <div class="al-row"><label><input type="checkbox" id="al-crash"> Server stopped unexpectedly</label></div>
+          <div class="al-row"><label><input type="checkbox" id="al-started"> Server started</label></div>
+          <div class="al-row"><label><input type="checkbox" id="al-tps-on"> Low TPS</label> below <input class="inp" id="al-tps-below" type="number" min="1" max="20"> for (minutes) <input class="inp" id="al-tps-min" type="number" min="1" max="60"></div>
+          <div class="al-row"><label><input type="checkbox" id="al-ram-on"> High memory use</label> above % <input class="inp" id="al-ram-pct" type="number" min="50" max="100"> for (minutes) <input class="inp" id="al-ram-min" type="number" min="1" max="60"></div>
+          <div class="al-row"><label><input type="checkbox" id="al-disk-on"> Low disk space</label> below (GB) <input class="inp" id="al-disk-gb" type="number" min="0.1" step="0.5"></div>
+          <div class="al-row">Minimum gap between alerts of the same kind (minutes) <input class="inp" id="al-cool" type="number" min="1" max="1440"></div>
+          <div style="display:flex;gap:8px;"><button class="btn btn-primary" onclick="saveAlerts()">💾 Save</button><button class="btn btn-ghost" onclick="testAlert()">Send test alert</button></div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-plugins">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Installed plugins</div><span id="pl-ver" style="font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Enabling, disabling and deleting need a server restart to take effect. Search and install from Modrinth verifies the file hash and picks a version compatible with your server.</div>
+          <div id="pl-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px;">Install a plugin</div>
+          <div class="inp-row"><input class="inp" id="pl-q" placeholder="Search Modrinth..." onkeydown="if(event.key==='Enter')searchPlugins()"><button class="btn btn-primary" style="flex:0 0 auto;" onclick="searchPlugins()">Search</button></div>
+          <div id="pl-results"></div>
+        </div>
+      </div>
+
+      <div class="sub-page" id="settings-jar">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:6px;">Download Paper</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Downloads the latest stable build of official Paper and verifies its checksum. Afterwards set MC_JAR in your .env to the file name and restart the panel. (Current jar: <span id="jar-current" dir="ltr"></span>)</div>
+          <div class="inp-row"><select class="inp" id="jar-version" style="max-width:200px;"></select><button class="btn btn-primary" style="flex:0 0 auto;" id="jar-go" onclick="downloadJar()">Download</button></div>
+          <label style="font-size:13px;"><input type="checkbox" id="jar-eula"> I accept the Minecraft EULA (aka.ms/MinecraftEULA) and want eula=true written</label>
         </div>
       </div>
 
@@ -943,7 +1082,7 @@ var PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/;
 var ws=null, wsConnected=false, running=false;
 var players=new Map(), cmdHistory=[], cmdHistIdx=-1;
 var currentFilePath='', currentEditFile='';
-var backups=[], startTime=null, uptimeTimer=null, listInterval=null, autoBackupInterval=null;
+var backups=[], startTime=null, uptimeTimer=null, listInterval=null;
 var ramHistory=new Array(20).fill(0);
 var cpuHistory=new Array(20).fill(0);
 var MAX_LOG_NODES=800, modalCallback=null, promptCallback=null, autoScrollEnabled=true, showLineNumbers=false;
@@ -964,9 +1103,9 @@ async function login(){
   var btn=document.getElementById('loginBtn'),err=document.getElementById('lerr');
   btn.disabled=true;btn.textContent='...';err.style.display='none';
   try{
-    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('un').value,password:document.getElementById('pw').value})});
-    if(r.ok){document.getElementById('login-screen').style.display='none';document.getElementById('panel').style.display='flex';initWS();fetchStatus();loadFiles('');loadBackups();loadProps();fetchInfo();}
-    else{var d=await r.json().catch(function(){return{};});err.textContent=r.status===429?(d.error||'Too many attempts'):'Wrong credentials';err.style.display='block';}
+    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('un').value,password:document.getElementById('pw').value,code:document.getElementById('tfacode').value})});
+    if(r.ok){afterLogin();}
+    else{var d=await r.json().catch(function(){return{};});if(d.needCode){document.getElementById('tfacode').style.display='block';document.getElementById('tfacode').focus();}err.textContent=(r.status===429||d.needCode)?(d.error||'Too many attempts'):'Wrong credentials';err.style.display='block';}
   }catch(e){err.textContent='Connection error';err.style.display='block';}
   finally{btn.disabled=false;btn.textContent='Log in';}
 }
@@ -1075,14 +1214,15 @@ function renderPlayers(){
   list.forEach(function(entry){var name=entry[0],display=entry[1],safeName=esc(name),safeDisplay=esc(display),card=document.createElement('div');card.className='player-card';card.setAttribute('data-popen',name);card.innerHTML='<div class="player-avatar">🧑</div><div class="player-info"><div class="player-name-row"><div class="player-name">'+safeDisplay+'</div><button class="copy-btn" data-pcopy="'+safeName+'" title="Copy name">⧉</button></div><div class="player-status"><div class="player-online-dot"></div>Online</div><div class="player-btns"><button class="act-btn act-ok" data-pa="op" data-pn="'+safeName+'">OP</button><button class="act-btn act-warn" data-pa="kick" data-pn="'+safeName+'">Kick</button><button class="act-btn act-danger" data-pa="ban" data-pn="'+safeName+'">Ban</button></div></div>';grid.appendChild(card);});
 }
 async function pa(action){var p=document.getElementById('pname').value.trim();if(!p){toast('Enter a player name','err');return;}if(!PLAYER_RE.test(p)){toast('Invalid name','err');return;}await qp(action,p);}
-async function qp(action,player){try{await apiPost('/api/player/'+action,{player:player});toast(action+': '+esc(player));}catch(e){toast(e.message,'err');}}
+function banDialog(player){var m=window.prompt('Ban length in minutes (leave empty for a permanent ban):','');if(m===null)return;var r=window.prompt('Reason (optional):','');if(r===null)return;var mins=parseInt(m,10);apiPost('/api/player/tempban',{player:player,minutes:isNaN(mins)?0:mins,reason:r}).then(function(){toast('Banned: '+player);}).catch(function(e){toast(e.message,'err');});}
+async function qp(action,player){if(action==='ban'){banDialog(player);return;}try{await apiPost('/api/player/'+action,{player:player});toast(action+': '+esc(player));}catch(e){toast(e.message,'err');}}
 function wlAction(a){var name=document.getElementById('wl-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast('Invalid name','err');return;}cmd('whitelist '+a+' '+name);toast('whitelist '+a+': '+name);}
 function opAction(a){var name=document.getElementById('op-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast('Invalid name','err');return;}qp(a,name);}
 function banAction(){var name=document.getElementById('ban-name').value.trim(),reason=document.getElementById('ban-reason').value.trim();if(!name||!PLAYER_RE.test(name)){toast('Invalid name','err');return;}cmd('ban '+name+(reason?' '+reason:''));toast('Ban: '+name);}
 function unbanAction(){var name=document.getElementById('ban-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast('Invalid name','err');return;}qp('unban',name);}
 async function unbanFromList(name){await qp('unban',name);setTimeout(loadBans,600);}
 async function loadOps(){var tb=document.getElementById('ops-body');tb.innerHTML='<tr class="empty"><td colspan="3">Loading...</td></tr>';try{var d=await fetch('/api/ops').then(function(r){return r.json();});document.getElementById('total-ops').textContent=d.ops.length||'0';if(!d.ops.length){tb.innerHTML='<tr class="empty"><td colspan="3">No operators</td></tr>';return;}tb.innerHTML='';d.ops.forEach(function(o){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(o.name||'—')+'</span></td><td><span class="badge badge-op">Level '+(o.level||4)+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(o.uuid||'—')+'</td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">Failed to load</td></tr>';}}
-async function loadBans(){var tb=document.getElementById('bans-body');tb.innerHTML='<tr class="empty"><td colspan="4">Loading...</td></tr>';try{var d=await fetch('/api/bans').then(function(r){return r.json();});document.getElementById('total-banned').textContent=d.bans.length||'0';if(!d.bans.length){tb.innerHTML='<tr class="empty"><td colspan="4">No banned players</td></tr>';return;}tb.innerHTML='';d.bans.forEach(function(b){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(b.name||'—')+'</span></td><td style="font-size:12px;color:var(--danger)">'+esc(b.reason||'—')+'</td><td style="font-size:11px;color:var(--muted)">'+esc(b.created||'—')+'</td><td><button class="act-btn act-ok" data-unban="'+esc(b.name||'')+'">Unban</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="4">Failed to load</td></tr>';}}
+async function loadBans(){var tb=document.getElementById('bans-body');tb.innerHTML='<tr class="empty"><td colspan="4">Loading...</td></tr>';try{var d=await fetch('/api/bans').then(function(r){return r.json();});document.getElementById('total-banned').textContent=d.bans.length||'0';if(!d.bans.length){tb.innerHTML='<tr class="empty"><td colspan="4">No banned players</td></tr>';return;}tb.innerHTML='';d.bans.forEach(function(b){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(b.name||'—')+'</span></td><td style="font-size:12px;color:var(--danger)">'+esc(b.reason||'—')+(b.expires?' ⏳ '+esc(fmtDate(b.expires)):'')+'</td><td style="font-size:11px;color:var(--muted)">'+esc(b.created||'—')+'</td><td><button class="act-btn act-ok" data-unban="'+esc(b.name||'')+'">Unban</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="4">Failed to load</td></tr>';}}
 async function loadWhitelist(){var tb=document.getElementById('wl-body');tb.innerHTML='<tr class="empty"><td colspan="3">Loading...</td></tr>';try{var d=await fetch('/api/whitelist').then(function(r){return r.json();});if(!d.whitelist.length){tb.innerHTML='<tr class="empty"><td colspan="3">Whitelist is empty</td></tr>';return;}tb.innerHTML='';d.whitelist.forEach(function(w){var sn=esc(w.name||'—'),tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+sn+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(w.uuid||'—')+'</td><td><button class="act-btn act-danger" data-wlrm="'+sn+'">Remove</button></td>';tb.appendChild(tr);});}catch(e){tb.innerHTML='<tr class="empty"><td colspan="3">Failed to load</td></tr>';}}
 
 async function loadAllPlayers(){
@@ -1438,8 +1578,6 @@ function renderBackups(){var list=document.getElementById('backup-list');if(!bac
 async function createBackup(){var btns=Array.prototype.slice.call(document.querySelectorAll('[onclick="createBackup()"]'));btns.forEach(function(b){b.disabled=true;b.textContent='Working...';});try{var d=await apiPost('/api/backups/create');toast('Backup created: '+d.name);loadBackups();}catch(e){toast(e.message,'err');}finally{btns.forEach(function(b){b.disabled=false;b.textContent='+ Create backup';});}}
 function restoreBackup(name){confirm2('Restore backup','The server will stop and this will be restored: "'+name+'". This cannot be undone.',async function(){try{await apiPost('/api/backups/restore',{name:name});toast('Restoring...','warn');}catch(e){toast(e.message,'err');}});}
 function deleteBackup(name){confirm2('Delete backup','Delete "'+name+'"?',async function(){try{await apiPost('/api/backups/delete',{name:name});toast('Deleted');loadBackups();}catch(e){toast(e.message,'err');}});}
-function setAutoBackup(){var mins=parseInt(document.getElementById('auto-backup-interval').value)||60;if(mins<5){toast('Minimum 5 minutes','err');return;}clearInterval(autoBackupInterval);autoBackupInterval=setInterval(function(){if(running){cmd('save-all');setTimeout(function(){createBackup();},3000);}},mins*60000);document.getElementById('auto-backup-status').textContent='Enabled — every '+mins+' min';document.getElementById('auto-backup-status').style.color='var(--accent)';toast('Auto backup every '+mins+' min');}
-function clearAutoBackup(){clearInterval(autoBackupInterval);autoBackupInterval=null;document.getElementById('auto-backup-status').textContent='Disabled';document.getElementById('auto-backup-status').style.color='';toast('Stopped','warn');}
 
 var PROP_SCHEMA=[
  {cat:'General',key:'motd',label:'MOTD (server message)',type:'text',def:'A Minecraft Server'},
@@ -1578,6 +1716,148 @@ async function loadStartupSettings(){try{var d=await fetch('/api/settings/startu
 function applyPanelSettings(){var e=document.getElementById('pref-maxlog');MAX_LOG_NODES=parseInt(e?e.value:'800')||800;var pa=document.getElementById('pref-autoscroll');if(pa)setAutoScroll(pa.checked);var pl=document.getElementById('pref-linenum');if(pl){showLineNumbers=pl.checked;var b=document.getElementById('linenum-btn');if(b)b.classList.toggle('active-toggle',showLineNumbers);}toast('Settings saved ✓');}
 function toggleAutoList(){var on=document.getElementById('pref-autolist').checked;if(on&&running&&!listInterval)listInterval=setInterval(function(){if(running&&wsConnected)cmd('list');},30000);else if(!on){clearInterval(listInterval);listInterval=null;}}
 
+
+// ════════════ OFF-SITE BACKUP ════════════
+async function loadOffsite(){try{var c=await fetch('/api/backups/offsite').then(function(r){return r.json();});document.getElementById('off-on').checked=!!c.enabled;document.getElementById('off-remote').value=c.remote||'';}catch(e){}}
+async function saveOffsite(){try{await apiPost('/api/backups/offsite',{enabled:document.getElementById('off-on').checked,remote:document.getElementById('off-remote').value});toast('Saved');loadOffsite();}catch(e){toast(e.message,'err');}}
+async function testOffsite(){try{await saveOffsite();await apiPost('/api/backups/offsite/test');toast('Connection works');}catch(e){toast(e.message,'err');}}
+
+// ════════════ SCHEDULER ════════════
+var SCH_LABEL={backup:'Backup',restart:'Restart',command:'Command',broadcast:'Broadcast'};
+function schTypeChanged(){var t=document.getElementById('sch-type').value,arg=document.getElementById('sch-arg'),num=document.getElementById('sch-num');
+  arg.style.display=(t==='command'||t==='broadcast')?'':'none';arg.placeholder=t==='command'?'Command, e.g. save-all':'Message text';
+  num.style.display=(t==='backup'||t==='restart')?'':'none';num.placeholder=t==='backup'?'Backups to keep (0 = all)':'Warning seconds before restart';num.title=num.placeholder;num.value=t==='backup'?7:60;}
+function schPresetChanged(){var v=document.getElementById('sch-preset').value;if(v)document.getElementById('sch-cron').value=v;}
+async function loadSchedule(){try{var d=await fetch('/api/schedule').then(function(r){return r.json();});renderSchedule(d.tasks||[]);}catch(e){}}
+function renderSchedule(tasks){var list=document.getElementById('sch-list');if(!list)return;list.textContent='';
+  if(!tasks.length){var e=document.createElement('div');e.style.cssText='text-align:center;color:var(--muted);padding:18px;font-size:13px;';e.textContent='No scheduled tasks yet';list.appendChild(e);return;}
+  tasks.forEach(function(t){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';
+    var info=document.createElement('div');info.style.cssText='flex:1;min-width:200px;';
+    var n=document.createElement('div');n.className='backup-name';n.textContent=t.name;
+    var b=document.createElement('span');b.className='badge '+(t.enabled?'badge-on':'badge-off');b.style.margin='0 6px';b.textContent=t.enabled?'Enabled':'Paused';n.appendChild(b);
+    var extra=t.type==='backup'?(t.keep?' · keeps last '+t.keep+' backups':''):t.type==='restart'?' · warns '+t.warn+'s':' · '+t.arg;
+    var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';
+    m.textContent=SCH_LABEL[t.type]+' · '+t.cron+extra+' · Last run: '+(t.lastRun?new Date(t.lastRun).toLocaleString()+' ('+t.lastStatus+')':'Never ran');
+    info.appendChild(n);info.appendChild(m);row.appendChild(info);
+    var acts=document.createElement('div');acts.style.cssText='display:flex;gap:6px;';
+    function mk(txt,fn,cls){var x=document.createElement('button');x.className='btn '+(cls||'btn-ghost');x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=txt;x.onclick=fn;acts.appendChild(x);}
+    mk(t.enabled?'Pause':'Enable',function(){schToggle(t.id,!t.enabled);});
+    mk('Run now',function(){schRun(t.id);});
+    mk('Delete',function(){schDelete(t.id);},'btn-ghost');
+    row.appendChild(acts);list.appendChild(row);});}
+async function addSchedule(){var t=document.getElementById('sch-type').value,body={type:t,name:document.getElementById('sch-name').value,cron:document.getElementById('sch-cron').value};
+  if(t==='backup')body.keep=document.getElementById('sch-num').value;else if(t==='restart')body.warn=document.getElementById('sch-num').value;else body.arg=document.getElementById('sch-arg').value;
+  try{await apiPost('/api/schedule',body);toast('Task added');document.getElementById('sch-name').value='';document.getElementById('sch-arg').value='';loadSchedule();}catch(e){toast(e.message,'err');}}
+async function schToggle(id,en){try{await apiPost('/api/schedule/update',{id:id,enabled:en});loadSchedule();}catch(e){toast(e.message,'err');}}
+async function schRun(id){try{var d=await apiPost('/api/schedule/run',{id:id});toast('Executed: '+d.status);loadSchedule();}catch(e){toast(e.message,'err');}}
+function schDelete(id){confirm2('Delete task','Delete this task?',async function(){try{await apiPost('/api/schedule/delete',{id:id});toast('Task deleted');loadSchedule();}catch(e){toast(e.message,'err');}});}
+
+// ════════════ USERS, ROLES, AUDIT ════════════
+var myLevel=1,myRole='viewer',myName='',ROLE_LABEL={viewer:'Viewer',mod:'Moderator',admin:'Admin',owner:'Owner'};
+async function applyRole(){
+  try{var me=await fetch('/api/me').then(function(r){return r.json();});myLevel=me.level||1;myRole=me.role;myName=me.username;myTfa=!!me.twoFa;}catch(e){myLevel=1;}
+  for(var i=1;i<=4;i++)document.body.classList.remove('lvl-'+i);document.body.classList.add('lvl-'+myLevel);
+  document.getElementById('whoami').textContent=myName+' · '+(ROLE_LABEL[myRole]||'');
+}
+function renderAccount(){renderTfa();document.getElementById('acct-name').textContent=myName;document.getElementById('acct-role').textContent=ROLE_LABEL[myRole]||'';}
+async function changeMyPassword(){var c=document.getElementById('acct-cur'),n=document.getElementById('acct-new');
+  try{await apiPost('/api/me/password',{current:c.value,newPassword:n.value});c.value='';n.value='';toast('Password changed');}catch(e){toast(e.message,'err');}}
+async function loadUsers(){try{var d=await fetch('/api/users').then(function(r){return r.json();});renderUsers(d.users||[]);}catch(e){}}
+function renderUsers(users){var list=document.getElementById('users-list');list.textContent='';
+  users.forEach(function(u){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';row.style.gap='8px';
+    var n=document.createElement('div');n.className='backup-name';n.style.flex='1';n.textContent=u.username+(u.owner?' (owner)':'');row.appendChild(n);
+    if(u.owner){var b=document.createElement('span');b.className='badge badge-op';b.textContent=ROLE_LABEL.owner;row.appendChild(b);list.appendChild(row);return;}
+    var sel=document.createElement('select');sel.className='inp';sel.style.cssText='max-width:130px;padding:5px 8px;';
+    ['viewer','mod','admin'].forEach(function(r){var o=document.createElement('option');o.value=r;o.textContent=ROLE_LABEL[r];if(r===u.role)o.selected=true;sel.appendChild(o);});
+    sel.onchange=function(){apiPost('/api/users/update',{username:u.username,role:sel.value}).then(function(){toast('Updated');}).catch(function(e){toast(e.message,'err');loadUsers();});};
+    row.appendChild(sel);
+    function mk(t,fn){var x=document.createElement('button');x.className='btn btn-ghost';x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=t;x.onclick=fn;row.appendChild(x);}
+    mk('Reset 2FA',function(){apiPost('/api/users/update',{username:u.username,resetTotp:true}).then(function(){toast('Done');}).catch(function(e){toast(e.message,'err');});});
+    mk('New password',function(){var p=window.prompt('Enter the new password (at least 8 characters):');if(!p)return;apiPost('/api/users/update',{username:u.username,password:p}).then(function(){toast('Updated');}).catch(function(e){toast(e.message,'err');});});
+    mk('Delete',function(){confirm2('Delete user',u.username+': This user loses access immediately. Continue?',async function(){try{await apiPost('/api/users/delete',{username:u.username});toast('User deleted');loadUsers();}catch(e){toast(e.message,'err');}});});
+    list.appendChild(row);});}
+async function addUser(){var nm=document.getElementById('nu-name'),pw=document.getElementById('nu-pass'),rl=document.getElementById('nu-role');
+  try{await apiPost('/api/users',{username:nm.value.trim(),password:pw.value,role:rl.value});nm.value='';pw.value='';toast('User added');loadUsers();}catch(e){toast(e.message,'err');}}
+async function loadAudit(){try{var d=await fetch('/api/audit').then(function(r){return r.json();});renderAudit(d.entries||[]);}catch(e){}}
+function renderAudit(es){var box=document.getElementById('audit-list');
+  if(!es.length){box.innerHTML='<div style="text-align:center;color:var(--muted);padding:18px;font-size:13px;">No activity yet</div>';return;}
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px;direction:ltr;text-align:start;"><tr style="color:var(--muted);text-align:start;"><th style="padding:4px 8px;text-align:start;">Time</th><th style="padding:4px 8px;text-align:start;">User</th><th style="padding:4px 8px;text-align:start;">IP</th><th style="padding:4px 8px;text-align:start;">Action</th><th style="padding:4px 8px;text-align:start;">Details</th></tr>';
+  es.forEach(function(e){var bad=/FAILED|DENIED/.test(e.a);h+='<tr style="border-top:1px solid var(--border);'+(bad?'color:var(--danger);':'')+'"><td style="padding:4px 8px;white-space:nowrap;">'+esc(fmtDate(e.t))+'</td><td style="padding:4px 8px;">'+esc(e.u)+'</td><td style="padding:4px 8px;">'+esc(e.ip)+'</td><td style="padding:4px 8px;font-family:\'IBM Plex Mono\',monospace;">'+esc(e.a)+'</td><td style="padding:4px 8px;word-break:break-all;">'+esc(e.d)+'</td></tr>';});
+  box.innerHTML=h+'</table>';}
+async function afterLogin(){document.getElementById('login-screen').style.display='none';document.getElementById('panel').style.display='flex';
+  await applyRole();initWS();fetchStatus();fetchInfo();loadHistory();clearInterval(histTimer);histTimer=setInterval(function(){var p=document.getElementById('page-overview');if(p&&p.classList.contains('active'))loadHistory();},60000);if(myLevel>=3){loadFiles('');loadBackups();loadProps();}}
+
+
+// ════════════ TWO-FACTOR ════════════
+var myTfa=false;
+function renderTfa(){var b=document.getElementById('tfa-badge');if(!b)return;b.className='badge '+(myTfa?'badge-on':'badge-off');b.textContent=myTfa?'Enabled':'Disabled';
+  document.getElementById('tfa-on').style.display=myTfa?'block':'none';document.getElementById('tfa-off').style.display=myTfa?'none':'block';document.getElementById('tfa-setup').style.display='none';}
+async function tfaBegin(){try{var d=await apiPost('/api/me/2fa/begin');document.getElementById('tfa-secret').textContent=d.secret.replace(/(.{4})/g,'$1 ').trim();document.getElementById('tfa-setup').style.display='block';}catch(e){toast(e.message,'err');}}
+async function tfaConfirm(){try{await apiPost('/api/me/2fa/confirm',{code:document.getElementById('tfa-confirm-code').value});myTfa=true;document.getElementById('tfa-confirm-code').value='';renderTfa();toast('Two-factor authentication enabled');}catch(e){toast(e.message,'err');}}
+async function tfaDisable(){try{await apiPost('/api/me/2fa/disable',{password:document.getElementById('tfa-dis-pw').value,code:document.getElementById('tfa-dis-code').value});myTfa=false;document.getElementById('tfa-dis-pw').value='';document.getElementById('tfa-dis-code').value='';renderTfa();toast('Two-factor authentication disabled');}catch(e){toast(e.message,'err');}}
+
+
+// ════════════ PLUGINS + SERVER JAR ════════════
+async function loadPlugins(){try{var d=await fetch('/api/plugins').then(function(r){return r.json();});document.getElementById('pl-ver').textContent=d.mcVersion?('MC '+d.mcVersion):'';renderPlugins(d.plugins||[]);}catch(e){}}
+function renderPlugins(list){var box=document.getElementById('pl-list');box.textContent='';
+  if(!list.length){var e=document.createElement('div');e.style.cssText='text-align:center;color:var(--muted);padding:16px;font-size:13px;';e.textContent='No plugins';box.appendChild(e);return;}
+  list.forEach(function(p){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';row.style.gap='8px';
+    var info=document.createElement('div');info.style.flex='1';var n=document.createElement('div');n.className='backup-name';n.textContent=(p.name||p.file)+(p.version?'  '+p.version:'');
+    var b=document.createElement('span');b.className='badge '+(p.enabled?'badge-on':'badge-off');b.style.margin='0 6px';b.textContent=p.enabled?'Enabled':'Disabled';n.appendChild(b);
+    var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';m.textContent=p.file+' · '+fmtBytes(p.size);info.appendChild(n);info.appendChild(m);row.appendChild(info);
+    function mk(t,fn){var x=document.createElement('button');x.className='btn btn-ghost';x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=t;x.onclick=fn;row.appendChild(x);}
+    mk(p.enabled?'Disable':'Enable',function(){apiPost('/api/plugins/toggle',{file:p.file}).then(loadPlugins).catch(function(e){toast(e.message,'err');});});
+    mk('Delete',function(){confirm2('Delete plugin',p.file+': The file will be deleted permanently. Continue?',async function(){try{await apiPost('/api/plugins/delete',{file:p.file});loadPlugins();}catch(e){toast(e.message,'err');}});});
+    box.appendChild(row);});}
+async function searchPlugins(){var q=document.getElementById('pl-q').value.trim(),box=document.getElementById('pl-results');if(!q)return;box.textContent='...';
+  try{var d=await fetch('/api/plugins/search?q='+encodeURIComponent(q)).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;});
+    box.textContent='';if(!d.results.length){box.textContent='No results';return;}
+    d.results.forEach(function(h){var row=document.createElement('div');row.className='backup-row';row.style.gap='8px';
+      var info=document.createElement('div');info.style.flex='1';var n=document.createElement('div');n.className='backup-name';n.textContent=h.title;var m=document.createElement('div');m.className='backup-meta';m.textContent=h.description+' · '+h.downloads+' downloads';info.appendChild(n);info.appendChild(m);row.appendChild(info);
+      var x=document.createElement('button');x.className='btn btn-primary';x.style.cssText='padding:5px 12px;font-size:12px;';x.textContent='Install';
+      x.onclick=async function(){x.disabled=true;x.textContent='...';try{var r=await apiPost('/api/plugins/install',{id:h.id});toast('Installed: '+r.file+' — restart the server to load it');loadPlugins();x.textContent='✓';}catch(e){toast(e.message,'err');x.disabled=false;x.textContent='Install';}};
+      row.appendChild(x);box.appendChild(row);});
+  }catch(e){box.textContent='';toast(e.message,'err');}}
+async function loadJarVersions(){try{var d=await fetch('/api/jars/paper').then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;});document.getElementById('jar-current').textContent=d.current||'';
+  var sel=document.getElementById('jar-version');sel.textContent='';d.versions.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});}catch(e){toast(e.message,'err');}}
+async function downloadJar(){var b=document.getElementById('jar-go'),v=document.getElementById('jar-version').value;if(!v)return;b.disabled=true;b.textContent='...';
+  try{var r=await apiPost('/api/jars/paper',{version:v,eula:document.getElementById('jar-eula').checked});toast('Downloaded: '+r.file+' — then set MC_JAR in .env');}catch(e){toast(e.message,'err');}finally{b.disabled=false;b.textContent='Download';}}
+
+// ════════════ HISTORY + ALERTS ════════════
+var histData=null,histTimer=null;
+async function loadHistory(){try{histData=await fetch('/api/monitor/history').then(function(r){return r.json();});drawHistory();}catch(e){}}
+function drawSeries(id,ts,vals,fixedMax,fmt){
+  var svg=document.getElementById('hc-'+id),lab=document.getElementById('hv-'+id);if(!svg)return;
+  var pts=[],i;for(i=0;i<vals.length;i++)if(vals[i]!=null)pts.push(vals[i]);
+  if(!pts.length){svg.innerHTML='';lab.textContent='—';return;}
+  var max=fixedMax||Math.max.apply(null,pts)*1.1||1,min=fixedMax?0:Math.min(0,Math.min.apply(null,pts)),span=ts[ts.length-1]-ts[0]||1,d='',pen=false;
+  for(i=0;i<vals.length;i++){if(vals[i]==null){pen=false;continue;}var x=(ts[i]-ts[0])/span*300,y=68-(vals[i]-min)/((max-min)||1)*64;d+=(pen?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);pen=true;}
+  svg.innerHTML='<path d="'+d+'"/>';
+  var last=pts[pts.length-1];lab.textContent=fmt(last)+'  ('+fmt(Math.min.apply(null,pts))+' – '+fmt(Math.max.apply(null,pts))+')';
+}
+function drawHistory(){
+  var empty=document.getElementById('hist-empty');if(!histData||!histData.t||histData.t.length<2){if(empty)empty.style.display='block';return;}
+  empty.style.display='none';
+  var mins=parseInt(document.getElementById('hist-range').value,10),n=Math.min(mins,histData.t.length),ts=histData.t.slice(-n);
+  function cut(k){return histData[k].slice(-n);}
+  drawSeries('tps',ts,cut('tps'),20,function(v){return v.toFixed(1);});
+  drawSeries('players',ts,cut('players'),0,function(v){return String(Math.round(v));});
+  drawSeries('ram',ts,cut('ram'),0,function(v){return String(Math.round(v));});
+  drawSeries('cpu',ts,cut('cpu'),100,function(v){return v.toFixed(0)+'%';});
+  drawSeries('disk',ts,cut('disk'),0,function(v){return v.toFixed(1);});
+}
+async function loadAlerts(){try{var c=await fetch('/api/alerts').then(function(r){return r.json();});
+  document.getElementById('al-discord').value=c.discord||'';document.getElementById('al-tgtoken').value=c.telegramToken||'';document.getElementById('al-tgchat').value=c.telegramChat||'';
+  document.getElementById('al-crash').checked=!!c.crash;document.getElementById('al-started').checked=!!c.started;
+  document.getElementById('al-tps-on').checked=!!c.lowTps.on;document.getElementById('al-tps-below').value=c.lowTps.below;document.getElementById('al-tps-min').value=c.lowTps.forMin;
+  document.getElementById('al-ram-on').checked=!!c.highRam.on;document.getElementById('al-ram-pct').value=c.highRam.abovePct;document.getElementById('al-ram-min').value=c.highRam.forMin;
+  document.getElementById('al-disk-on').checked=!!c.lowDisk.on;document.getElementById('al-disk-gb').value=c.lowDisk.belowGB;document.getElementById('al-cool').value=c.cooldownMin;}catch(e){}}
+async function saveAlerts(){var g=function(i){return document.getElementById(i);};
+  try{await apiPost('/api/alerts',{discord:g('al-discord').value,telegramToken:g('al-tgtoken').value,telegramChat:g('al-tgchat').value,crash:g('al-crash').checked,started:g('al-started').checked,
+    lowTps:{on:g('al-tps-on').checked,below:g('al-tps-below').value,forMin:g('al-tps-min').value},highRam:{on:g('al-ram-on').checked,abovePct:g('al-ram-pct').value,forMin:g('al-ram-min').value},
+    lowDisk:{on:g('al-disk-on').checked,belowGB:g('al-disk-gb').value},cooldownMin:g('al-cool').value});toast('Saved');loadAlerts();}catch(e){toast(e.message,'err');}}
+async function testAlert(){try{await apiPost('/api/alerts/test');toast('Test alert sent');}catch(e){toast(e.message,'err');}}
+
 // ════════════ NAV ════════════
 function resetScrollTop(){window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;}
 function showPage(name){
@@ -1588,12 +1868,14 @@ function showPage(name){
     resetScrollTop();
     document.documentElement.style.overflow='';
     var target=document.getElementById('page-'+name);if(target)target.classList.add('active');
-    var order=['overview','console','players','files','backups','settings'],idx=order.indexOf(name);
+    var order=['overview','console','players','files','backups','settings','account'],idx=order.indexOf(name);
     if(idx>-1){document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});var tabs=Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));if(tabs[idx])tabs[idx].classList.add('active');}
     if(name!=='player-detail'){pdCurrentName=null;pdCurrent=null;}
+    if(name==='overview')loadHistory();
     if(name==='files')loadFiles(currentFilePath);
-    if(name==='backups')loadBackups();
+    if(name==='backups'){loadBackups();loadSchedule();loadOffsite();schTypeChanged();}
     if(name==='players')loadAllPlayers();
+    if(name==='account')renderAccount();
     if(name==='settings'){loadProps();loadStartupSettings();}
     if(name==='console'){setTimeout(function(){var a=document.getElementById('log');if(a&&autoScrollEnabled)a.scrollTop=a.scrollHeight;},50);}
     requestAnimationFrame(resetScrollTop);
