@@ -889,5 +889,6 @@
  "ui.search_bans": "ابحث بالاسم أو السبب أو المشرف",
  "ui.ban_by": "حظره",
  "ui.ban_by_console": "الكونسول",
- "ui.search_plugins": "ابحث عن إضافة..."
+ "ui.search_plugins": "ابحث عن إضافة...",
+ "ui.jar_running_other": "يعمل الآن: {v0}، والجار الجديد يُطبَّق عند التشغيل القادم"
 }

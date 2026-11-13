@@ -89,7 +89,7 @@ pm2 save
 |---|---|---|
 | `PORT` | Panel port | `8080` |
 | `MC_DIR` | Minecraft server folder (jar and worlds), independent of where the panel lives | `/opt/minecraft` |
-| `MC_JAR` | Exact file name of the server jar | `spigot-26.3.jar` |
+| `MC_JAR` | Exact file name of the server jar (re-read from `.env` on every server start, no panel restart needed) | `spigot-26.3.jar` |
 | `TMUX_SESSION` | Name of the tmux session the server runs in | `mcserver` |
 | `SESSION_SECRET` | Session encryption key. If empty, a random one is generated at each start, so everyone is logged out after every panel restart | random |
 | `ADMIN_USER` | Login username | `admin` |

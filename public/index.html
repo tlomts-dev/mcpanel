@@ -2114,7 +2114,7 @@ async function searchPlugins(){var q=document.getElementById('pl-q').value.trim(
   }catch(e){box.textContent='';toast(e.message,'err');}}
 async function jarGet(url){var r=await fetch(url),j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;}
 async function loadJarVersions(){try{var d=await jarGet('/api/jars/paper');
-  document.getElementById('jar-current').textContent=d.current||'—';document.getElementById('jar-mc').textContent=d.mc||'—';document.getElementById('jar-build').textContent=d.build!=null?d.build:'—';
+  document.getElementById('jar-current').textContent=(d.current||'—')+(d.running&&d.running!==d.current?' ('+T('ui.jar_running_other',{v0:d.running})+')':'');document.getElementById('jar-mc').textContent=d.mc||'—';document.getElementById('jar-build').textContent=d.build!=null?d.build:'—';
   var sel=document.getElementById('jar-version'),keep=sel.value||d.mc;sel.textContent='';d.versions.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v+(v===d.mc?' ✓':'');sel.appendChild(o);});
   if(keep&&d.versions.indexOf(keep)>-1)sel.value=keep;loadJarBuilds();checkJarUpdate(false);}catch(e){toast(e.message,'err');}}
 async function loadJarBuilds(){var v=document.getElementById('jar-version').value,sel=document.getElementById('jar-build-sel');sel.textContent='';

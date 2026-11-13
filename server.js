@@ -2,7 +2,10 @@
  * MC Panel - server.js (v5 - Player Intelligence Edition)
  */
 
-require('dotenv').config();
+// A real environment variable (systemd, docker) wins over .env; remember it before dotenv fills in the rest.
+const REAL_MC_JAR = process.env.MC_JAR;
+const dotenv = require('dotenv');
+dotenv.config();
 
 const express    = require('express');
 const session    = require('express-session');
@@ -33,7 +36,24 @@ const PANEL_HTTP_PORT = parseInt(process.env.PANEL_HTTP_PORT || '28281', 10);
 // ── Config ────────────────────────────────────────────────────────────────────
 const PORT        = parseInt(process.env.PORT || '8080', 10);
 const SERVER_DIR  = path.resolve(process.env.MC_DIR || '/opt/minecraft');
-const SERVER_JAR  = process.env.MC_JAR || 'spigot-26.3.jar';
+// MC_JAR is read from .env again every time it is needed (each server start, status, update), so editing the file
+// takes effect on the next start without restarting the panel. A real environment variable still takes priority.
+// The name goes into a shell command, so only a plain jar file name is accepted.
+const JAR_NAME_RE = /^[\w.+-]{1,100}\.jar$/;
+const DEFAULT_JAR = 'spigot-26.3.jar';
+function readEnvFileValue(key) {
+  try {
+    const file = path.resolve(process.env.DOTENV_CONFIG_PATH || '.env');
+    return dotenv.parse(fs.readFileSync(file))[key];
+  } catch { return undefined; }
+}
+function serverJar() {
+  for (const v of [REAL_MC_JAR, readEnvFileValue('MC_JAR'), process.env.MC_JAR]) {
+    if (v && JAR_NAME_RE.test(String(v).trim())) return String(v).trim();
+  }
+  return DEFAULT_JAR;
+}
+const startedJars = new Set();   // jar names this panel has started; used to find the process even after MC_JAR changed
 const BACKUPS_DIR = path.join(SERVER_DIR, 'backups');
 const STARTUP_CFG = path.join(SERVER_DIR, '.panel-startup.json');
 const PLAYERS_DB_FILE = path.join(SERVER_DIR, '.panel-players.json');
@@ -520,11 +540,25 @@ function isRunning() {
   }
 }
 
+// The jar the running Java process was really started with (it can differ from MC_JAR after .env was edited).
+function runningJarName() {
+  try {
+    if (!isRunning()) return null;
+    const pid = getMcPid();
+    if (!pid) return null;
+    const args = fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split(' ');
+    const i = args.indexOf('-jar');
+    return i >= 0 && args[i + 1] ? path.basename(args[i + 1]) : null;
+  } catch { return null; }
+}
+
 function getMcPid() {
   try {
-    const out = execSync("pgrep -f '" + SERVER_JAR + "'").toString().trim();
-    if (!out) return null;
-    const pids = out.split('\n').filter(Boolean);
+    const pids = [];
+    for (const jar of new Set([...startedJars, serverJar()])) {
+      try { for (const x of execSync("pgrep -f '" + jar + "'").toString().trim().split('\n')) if (x && !pids.includes(x)) pids.push(x); } catch {}
+    }
+    if (!pids.length) return null;
     let best = null, bestRss = 0;
     for (const pid of pids) {
       try {
@@ -590,7 +624,7 @@ function detectVersion() {
     const m = /MC:\s*(\d+\.\d+(?:\.\d+)?)/.exec(String(h.currentVersion || ''));
     if (m) return found(m[1]);
   } catch {}
-  const jm = /(\d+\.\d+(?:\.\d+)?)/.exec(SERVER_JAR || '');
+  const jm = /(\d+\.\d+(?:\.\d+)?)/.exec(serverJar() || '');
   return jm ? jm[1] : null;
 }
 
@@ -771,7 +805,9 @@ function startMC() {
 
   try { fs.writeFileSync(MC_LOG_FILE, ''); } catch {}
 
-  const javaCmd = `java ${args.join(' ')} -jar ${SERVER_JAR} nogui`;
+  const jarName = serverJar();
+  startedJars.add(jarName);
+  const javaCmd = `java ${args.join(' ')} -jar ${jarName} nogui`;
 
   const tmuxCmd = [
     'tmux', 'new-session', '-d',
@@ -969,7 +1005,7 @@ app.get('/api/info', requireAuth, async (_req, res) => {
   res.json({
     running:   isRunning(),
     version:   detectVersion(),
-    jar:       SERVER_JAR,
+    jar:       serverJar(),
     serverDir: SERVER_DIR,
     pid:       mcPid || null,
     uptime:    serverStartTime ? Date.now() - serverStartTime : null,
@@ -1417,14 +1453,14 @@ function currentBuild() {
     const m = /Paper-(\d+)/i.exec(String(h.currentVersion || ''));
     if (m) return Number(m[1]);
   } catch {}
-  const jm = /-(\d+)\.jar$/.exec(SERVER_JAR || '');
+  const jm = /-(\d+)\.jar$/.exec(serverJar() || '');
   return jm ? Number(jm[1]) : null;
 }
 let updateCache = { at: 0, data: null };
 async function checkUpdate(force) {
   if (!force && updateCache.data && Date.now() - updateCache.at < 10 * 60000) return updateCache.data;
   const mc = mcVersionOnly(), build = currentBuild();
-  const data = { mc, build, jar: SERVER_JAR, latestBuild: null, newerVersion: null, updateAvailable: false };
+  const data = { mc, build, jar: serverJar(), latestBuild: null, newerVersion: null, updateAvailable: false };
   const versions = await downloads.paperVersions();
   if (mc) {
     try { const l = await downloads.paperLatest(mc); data.latestBuild = l.id; data.channel = l.channel; } catch {}
@@ -1437,7 +1473,7 @@ async function checkUpdate(force) {
   return data;
 }
 app.get('/api/jars/paper', async (_req, res) => {
-  try { res.json({ versions: await downloads.paperVersions(), current: SERVER_JAR, mc: mcVersionOnly(), build: currentBuild() }); }
+  try { res.json({ versions: await downloads.paperVersions(), current: serverJar(), running: runningJarName(), mc: mcVersionOnly(), build: currentBuild() }); }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
 app.get('/api/jars/paper/builds', async (req, res) => {
@@ -1464,11 +1500,11 @@ async function applyJarUpdate(newFile, { backup, restart }) {
       for (let i = 0; i < 90 && isRunning(); i++) await sleep(1000);
       if (isRunning()) throw new Error(t('srv.panel_update_stop_timeout'));
     }
-    const target = path.join(SERVER_DIR, SERVER_JAR), src = path.join(SERVER_DIR, newFile);
+    const target = path.join(SERVER_DIR, serverJar()), src = path.join(SERVER_DIR, newFile);
     if (path.resolve(target) !== path.resolve(src)) {
       const oldDir = path.join(SERVER_DIR, '.panel-old-jars');
       await fsp.mkdir(oldDir, { recursive: true });
-      if (fs.existsSync(target)) await fsp.rename(target, path.join(oldDir, SERVER_JAR + '.' + Date.now()));
+      if (fs.existsSync(target)) await fsp.rename(target, path.join(oldDir, serverJar() + '.' + Date.now()));
       await fsp.copyFile(src, target);
     }
     broadcast({ type: 'log', data: t('srv.panel_update_done', { v0: newFile }) + '\n' });
@@ -1873,7 +1909,7 @@ if (isRunning()) {
 // ── Listen ────────────────────────────────────────────────────────────────────
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Panel] http://localhost:${PORT}`);
-  console.log(`[Panel] MC dir: ${SERVER_DIR} | Jar: ${SERVER_JAR}`);
+  console.log(`[Panel] MC dir: ${SERVER_DIR} | Jar: ${serverJar()}`);
   console.log(`[Panel] tmux session: ${TMUX_SESSION} | Log: ${MC_LOG_FILE}`);
 });
 
