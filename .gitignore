@@ -7,3 +7,4 @@ backups/
 .panel-schedule.json
 .panel-users.json
 .panel-audit.log*
+.panel-updates/

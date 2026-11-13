@@ -2181,6 +2181,56 @@ if (isRunning()) {
   console.log(`[Panel] Attached to existing server (PID: ${mcPid || 'unknown'})`);
 }
 
+// ── About + updating the panel itself (lib/selfupdate.js) ──────────────────────────────────────────────────
+const { createSelfUpdate } = require('./lib/selfupdate');
+const selfUpdate = createSelfUpdate({
+  panelDir: PANEL_DIR, repo: process.env.PANEL_REPO, unzipper,
+  log: (step, info) => broadcast({ type: 'log', data: t('srv.panel_selfupdate_' + step, { v0: info }) + '\n' }),
+});
+const PANEL_STARTED = Date.now();
+// Who restarts the panel after an update: systemd and pm2 start it again when it exits, Docker images are updated
+// by pulling a new image (files changed inside a container are lost), and a panel started by hand restarts itself.
+function supervisor() {
+  if (fs.existsSync('/.dockerenv') || process.env.container === 'docker') return 'docker';
+  if (process.env.INVOCATION_ID) return 'systemd';
+  if (process.env.pm_id !== undefined) return 'pm2';
+  return 'none';
+}
+function restartPanel() {
+  const sup = supervisor();
+  broadcast({ type: 'log', data: t('srv.panel_selfupdate_restarting') + '\n' });
+  setTimeout(() => {
+    if (sup === 'none') {
+      // a small helper waits until this process has let go of the port, then starts the panel again
+      const helper = `setTimeout(()=>{require('child_process').spawn(${JSON.stringify(process.execPath)},${JSON.stringify([...process.execArgv, ...process.argv.slice(1)])},{cwd:${JSON.stringify(process.cwd())},detached:true,stdio:'ignore'}).unref()},2500)`;
+      spawn(process.execPath, ['-e', helper], { cwd: process.cwd(), env: process.env, detached: true, stdio: 'ignore' }).unref();
+      process.exit(0);
+    }
+    process.exit(75);   // non-zero, so systemd's Restart=on-failure brings it back; pm2 restarts on any exit
+  }, 1500);
+}
+app.get('/api/panel/about', (req, res) => {
+  const inst = selfUpdate.installed();
+  res.json({
+    version: inst.version, sha: inst.sha, channel: inst.channel, updatedAt: inst.at,
+    node: process.version, platform: process.platform + ' ' + process.arch, uptime: Date.now() - PANEL_STARTED,
+    repo: process.env.PANEL_REPO || 'tlomts-dev/mcpanel', supervisor: supervisor(), license: 'MIT',
+    canUpdate: auth.has(req.user, 'admin.update'),
+  });
+});
+app.get('/api/panel/update-check', async (req, res) => {
+  try { res.json(await selfUpdate.check(req.query.force === '1')); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
+app.get('/api/panel/update-status', (_req, res) => res.json(selfUpdate.status()));
+app.post('/api/panel/update', (req, res) => {
+  if (supervisor() === 'docker') return res.status(400).json({ error: t('srv.panel_selfupdate_docker') });
+  const r = selfUpdate.start((req.body || {}).channel, () => restartPanel());
+  if (r.error) return res.status(409).json({ error: t('srv.panel_selfupdate_busy') });
+  auth.audit(req.user, req.ip, 'PANEL_UPDATE', String((req.body || {}).channel || 'release'));
+  res.json({ success: true });
+});
+
 // ── Errors: bad JSON and the like get a short JSON answer, never an HTML page with a stack trace ─────────────
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);

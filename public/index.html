@@ -343,6 +343,18 @@ select.sel:focus{border-color:var(--accent2);}
 .up-err .up-meta{color:var(--danger);}
 .up-x{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;width:28px;height:28px;cursor:pointer;flex:0 0 auto;}
 .up-x:hover{color:var(--danger);border-color:var(--danger);}
+.about-hero{text-align:center;padding:28px 20px;}
+.about-logo{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:700;color:var(--accent);}
+.about-logo span{color:var(--muted);font-weight:400;}
+.about-tag{color:var(--muted);font-size:13px;margin-top:6px;}
+.about-ver{display:inline-block;margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:4px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);}
+.about-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.about-links .btn{text-decoration:none;padding:7px 12px;font-size:12px;}
+.ab-channel{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.ab-notes{margin-top:10px;font-size:12px;color:var(--text2);max-height:220px;overflow:auto;white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;display:none;}
+.ab-progress{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;}
+.ab-spin{width:20px;height:20px;border-radius:50%;border:3px solid var(--surface2);border-top-color:var(--accent);animation:abspin .9s linear infinite;flex:0 0 auto;}
+@keyframes abspin{to{transform:rotate(360deg);}}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;}
 .quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font),sans-serif;transition:.15s;text-align:center;}
 .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -544,6 +556,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
     <div class="nav-tab" data-perm="schedule.view" onclick="showPage('schedule')">@@ui.nav_schedule@@</div>
     <div class="nav-tab" id="nav-settings" onclick="showPage('settings')">@@ui.settings@@</div>
     <div class="nav-tab" onclick="showPage('account')">@@ui.account@@</div>
+    <div class="nav-tab" onclick="showPage('about')">@@ui.nav_about@@</div>
   </nav>
 
   <div class="ws-warn" id="wsWarn">@@ui.lost_connection_to_the_server_retrying@@</div>
@@ -963,6 +976,46 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">@@ui.sch_dests_hint@@</div>
           <div class="chip-row" id="sch-dests"></div>
           <label class="chip" style="margin-top:8px;"><input type="checkbox" id="sch-keeplocal" checked> @@ui.sch_keep_local@@</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-about">
+      <div class="card about-hero">
+        <div class="about-logo">MC<span>//</span>PANEL</div>
+        <div class="about-tag">@@ui.about_tagline@@</div>
+        <div class="about-ver" id="ab-version">—</div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px;">@@ui.about_info@@</div>
+          <div class="info-row"><span class="info-key">@@ui.about_version@@</span><span class="info-val" id="ab-ver2" dir="ltr">—</span></div>
+          <div class="info-row"><span class="info-key">@@ui.about_build@@</span><span class="info-val" id="ab-sha" dir="ltr">—</span></div>
+          <div class="info-row"><span class="info-key">Node.js</span><span class="info-val" id="ab-node" dir="ltr">—</span></div>
+          <div class="info-row"><span class="info-key">@@ui.about_system@@</span><span class="info-val" id="ab-os" dir="ltr">—</span></div>
+          <div class="info-row"><span class="info-key">@@ui.about_uptime@@</span><span class="info-val" id="ab-uptime">—</span></div>
+          <div class="info-row"><span class="info-key">@@ui.about_runs_under@@</span><span class="info-val" id="ab-sup">—</span></div>
+          <div class="info-row"><span class="info-key">@@ui.about_license@@</span><span class="info-val">MIT</span></div>
+          <div class="about-links">
+            <a class="btn btn-ghost" id="ab-repo" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a class="btn btn-ghost" id="ab-releases" target="_blank" rel="noopener noreferrer">@@ui.about_releases@@</a>
+            <a class="btn btn-ghost" id="ab-issues" target="_blank" rel="noopener noreferrer">@@ui.about_report_issue@@</a>
+          </div>
+        </div>
+        <div class="card" id="ab-update-card" style="display:none;">
+          <div class="card-title" style="margin-bottom:10px;">@@ui.about_update_title@@</div>
+          <div class="jar-status" id="ab-update-status">…</div>
+          <div class="ab-channel">
+            <label class="chip"><input type="radio" name="ab-ch" value="release" checked onchange="renderPanelUpdate()"> @@ui.about_ch_release@@</label>
+            <label class="chip"><input type="radio" name="ab-ch" value="main" onchange="renderPanelUpdate()"> @@ui.about_ch_main@@</label>
+          </div>
+          <div class="ab-notes" id="ab-notes"></div>
+          <div class="inp-row" style="margin-top:10px;">
+            <button class="btn btn-ghost" onclick="checkPanelUpdate(true)">@@ui.jar_check@@</button>
+            <button class="btn btn-primary" id="ab-update-btn" onclick="startPanelUpdate()">@@ui.about_update_now@@</button>
+          </div>
+          <div class="ab-progress" id="ab-progress" style="display:none;"><div class="ab-spin"></div><span id="ab-progress-text"></span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:10px;">@@ui.about_update_hint@@</div>
         </div>
       </div>
     </div>
@@ -2218,6 +2271,41 @@ function jarRun(v,build,apply){var backup=document.getElementById('jar-backup').
   if(apply)confirm2(T('ui.jar_confirm_title'),T('ui.jar_confirm_body',{v0:v+(build?' #'+build:'')}),go);else go();}
 function downloadJar(apply){var v=document.getElementById('jar-version').value;if(!v)return;jarRun(v,document.getElementById('jar-build-sel').value,apply);}
 
+
+// ════════════ ABOUT + PANEL UPDATE ════════════
+var abInfo=null,abCheck=null;
+function fmtDur(ms){var m=Math.floor(ms/60000),d=Math.floor(m/1440),h=Math.floor(m%1440/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m%60)+'m';}
+async function loadAbout(){try{abInfo=await jarGet('/api/panel/about');
+  document.getElementById('ab-version').textContent='v'+abInfo.version+(abInfo.channel==='main'&&abInfo.sha?' · main@'+abInfo.sha.slice(0,7):'');
+  document.getElementById('ab-ver2').textContent=abInfo.version;document.getElementById('ab-sha').textContent=abInfo.sha?abInfo.sha.slice(0,7)+(abInfo.channel?' ('+abInfo.channel+')':''):'—';
+  document.getElementById('ab-node').textContent=abInfo.node;document.getElementById('ab-os').textContent=abInfo.platform;document.getElementById('ab-uptime').textContent=fmtDur(abInfo.uptime);
+  document.getElementById('ab-sup').textContent=T('ui.about_sup_'+abInfo.supervisor);
+  var gh='https://github.com/'+abInfo.repo;document.getElementById('ab-repo').href=gh;document.getElementById('ab-releases').href=gh+'/releases';document.getElementById('ab-issues').href=gh+'/issues';
+  document.getElementById('ab-update-card').style.display=abInfo.canUpdate?'':'none';if(abInfo.canUpdate)checkPanelUpdate(false);}catch(e){toast(e.message,'err');}}
+function abChannel(){var r=document.querySelector('input[name="ab-ch"]:checked');return r?r.value:'release';}
+async function checkPanelUpdate(force){var st=document.getElementById('ab-update-status');st.className='jar-status';st.textContent=T('ui.pl_checking');
+  try{abCheck=await jarGet('/api/panel/update-check'+(force?'?force=1':''));renderPanelUpdate();}catch(e){st.textContent=e.message;}}
+function renderPanelUpdate(){var st=document.getElementById('ab-update-status'),notes=document.getElementById('ab-notes'),btn=document.getElementById('ab-update-btn');if(!abCheck)return;
+  var ch=abChannel(),docker=abInfo&&abInfo.supervisor==='docker';notes.style.display='none';
+  if(ch==='release'){var r=abCheck.release;if(!r){st.className='jar-status';st.textContent=abCheck.releaseError||T('ui.about_no_release');btn.disabled=true;return;}
+    st.className='jar-status '+(r.newer?'new':'ok');st.textContent=r.newer?T('ui.about_release_new',{v0:r.tag,v1:abCheck.current.version}):T('ui.about_release_same',{v0:r.tag});
+    if(r.notes){notes.textContent=r.notes;notes.style.display='';}btn.disabled=docker;btn.textContent=r.newer?T('ui.about_update_to',{v0:r.tag}):T('ui.about_reinstall',{v0:r.tag});}
+  else{var m=abCheck.main;if(!m){st.className='jar-status';st.textContent=abCheck.mainError||'—';btn.disabled=true;return;}
+    st.className='jar-status '+(m.newer===false?'ok':'new');st.textContent=(m.newer===false?T('ui.about_main_same'):m.newer?T('ui.about_main_new'):T('ui.about_main_unknown'))+' · '+m.sha.slice(0,7)+' · '+m.message;
+    btn.disabled=docker;btn.textContent=T('ui.about_update_to',{v0:'main@'+m.sha.slice(0,7)});}
+  if(docker){st.textContent+=' · '+T('ui.about_docker');}}
+function startPanelUpdate(){var ch=abChannel(),label=document.getElementById('ab-update-btn').textContent;
+  confirm2(T('ui.about_confirm_title'),T('ui.about_confirm_body',{v0:label}),async function(){
+    try{await apiPost('/api/panel/update',{channel:ch});}catch(e){toast(e.message,'err');return;}
+    var pr=document.getElementById('ab-progress'),tx=document.getElementById('ab-progress-text');pr.style.display='';document.getElementById('ab-update-btn').disabled=true;
+    var restarting=false;
+    for(var i=0;i<600;i++){await new Promise(function(r){setTimeout(r,1500);});
+      try{var r=await fetch('/api/panel/update-status');if(r.status===401&&restarting){location.reload();return;}if(r.ok){var s=await r.json();
+          if(s.step==='failed'){pr.style.display='none';document.getElementById('ab-update-btn').disabled=false;toast(T('ui.about_failed')+s.error,'err');return;}
+          if(!restarting)tx.textContent=T('ui.about_step_'+s.step);if(s.done){restarting=true;tx.textContent=T('ui.about_step_restart');}
+          else if(restarting){location.reload();return;}}   // the new panel answers again: done
+      }catch(e){restarting=true;tx.textContent=T('ui.about_step_restart');}}}); }
+
 // ════════════ HISTORY + ALERTS ════════════
 var histData=null,histTimer=null;
 async function loadHistory(){try{histData=await fetch('/api/monitor/history').then(function(r){return r.json();});drawHistory();}catch(e){}}
@@ -2267,12 +2355,13 @@ function showPage(name){
     resetScrollTop();
     document.documentElement.style.overflow='';
     var target=document.getElementById('page-'+name);if(target)target.classList.add('active');
-    var order=['overview','console','players','files','backups','schedule','settings','account'],idx=order.indexOf(name);
+    var order=['overview','console','players','files','backups','schedule','settings','account','about'],idx=order.indexOf(name);
     if(idx>-1){document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});var tabs=Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));if(tabs[idx])tabs[idx].classList.add('active');}
     if(name!=='player-detail'){pdCurrentName=null;pdCurrent=null;}
     if(name==='overview')loadHistory();
     if(name==='files')loadFiles(currentFilePath);
     if(name==='backups'){loadBackups();loadDestinations();}
+    if(name==='about')loadAbout();
     if(name==='schedule'){loadSchedule();loadDestinations();schTypeChanged();buildSchDays();schKindChanged();}
     if(name==='players')loadAllPlayers();
     if(name==='account')renderAccount();

@@ -338,3 +338,60 @@ test('scheduler: a scheduled restart does not start a server that was stopped on
   assert.strictEqual(await sch.runNow(r.task.id), 'skippedStopped');
   assert.strictEqual(restarts, 0);
 });
+
+test('selfupdate: release check, safe install with backup, rollback on failure', async () => {
+  const { createSelfUpdate, cmpVer } = require('../lib/selfupdate');
+  const unzipper = require('unzipper'), archiver = require('archiver');
+  assert.ok(cmpVer('v1.4.0', '1.3.9') > 0 && cmpVer('1.3.4', 'v1.3.4') === 0 && cmpVer('1.3.4', '1.10.0') < 0);
+  const makeZip = entries => new Promise((resolve, reject) => {
+    const a = new archiver.ZipArchive(), bufs = [];
+    a.on('data', d => bufs.push(d)); a.on('end', () => resolve(Buffer.concat(bufs))); a.on('error', reject);
+    for (const [n, c] of Object.entries(entries)) a.append(c, { name: 'o-r-abc123/' + n });
+    a.finalize();
+  });
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'server.js'), 'OLD');
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: '1.3.4', dependencies: { a: '1' } }));
+  fs.writeFileSync(path.join(dir, '.env'), 'SECRET=1');
+  let zip = await makeZip({ 'server.js': 'NEW', 'package.json': JSON.stringify({ version: '1.4.0', dependencies: { a: '1' } }), 'lib/new.js': 'x', '.env': 'EVIL', 'node_modules/x/i.js': 'x' });
+  const fake = async url => {
+    if (url.endsWith('/releases/latest')) return Response.json({ tag_name: 'v1.4.0', name: 'v1.4.0', body: 'notes' });
+    if (url.endsWith('/commits/main')) return Response.json({ sha: 'a'.repeat(40), commit: { message: 'msg', committer: { date: 'd' } } });
+    if (url.includes('/zipball/')) return new Response(zip);
+    return new Response('', { status: 404 });
+  };
+  const npmCalls = [];
+  const u = createSelfUpdate({ panelDir: dir, repo: 'o/r', fetchImpl: fake, unzipper, log: () => {}, exec: async (c, a) => { npmCalls.push(a); return ''; } });
+  const info = await u.check(true);
+  assert.strictEqual(info.release.newer, true);
+  assert.strictEqual(info.main.newer, null);                 // installed commit unknown
+  const wait = async () => { for (let i = 0; i < 100 && u.status().busy; i++) await new Promise(r => setTimeout(r, 20)); return u.status(); };
+  let done = null;
+  u.start('release', r => { done = r; });
+  let st = await wait();
+  assert.strictEqual(st.step, 'done', st.error);
+  assert.strictEqual(done.version, '1.4.0');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'server.js'), 'utf8'), 'NEW');
+  assert.strictEqual(fs.readFileSync(path.join(dir, '.env'), 'utf8'), 'SECRET=1');        // never overwritten
+  assert.ok(!fs.existsSync(path.join(dir, 'node_modules', 'x')));
+  assert.strictEqual(npmCalls.length, 0);                                                 // dependencies unchanged
+  const backups = fs.readdirSync(path.join(dir, '.panel-updates')).filter(d => d.startsWith('backup-'));
+  assert.strictEqual(fs.readFileSync(path.join(dir, '.panel-updates', backups[0], 'server.js'), 'utf8'), 'OLD');
+  assert.strictEqual(u.installed().version, '1.4.0');
+  // a failing npm install puts everything back
+  zip = await makeZip({ 'server.js': 'NEWER', 'package.json': JSON.stringify({ version: '1.5.0', dependencies: { a: '2' } }), 'lib/other.js': 'y' });
+  const u2 = createSelfUpdate({ panelDir: dir, repo: 'o/r', fetchImpl: fake, unzipper, log: () => {}, exec: async () => { throw new Error('npm broke'); } });
+  u2.start('main');
+  for (let i = 0; i < 100 && u2.status().busy; i++) await new Promise(r => setTimeout(r, 20));
+  assert.strictEqual(u2.status().step, 'failed');
+  assert.match(u2.status().error, /npm broke/);
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'server.js'), 'utf8'), 'NEW');
+  assert.ok(!fs.existsSync(path.join(dir, 'lib', 'other.js')));
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version, '1.4.0');
+  // something that is not the panel is refused
+  zip = await makeZip({ 'README.md': 'x' });
+  const u3 = createSelfUpdate({ panelDir: dir, repo: 'o/r', fetchImpl: fake, unzipper, log: () => {} });
+  u3.start('release');
+  for (let i = 0; i < 100 && u3.status().busy; i++) await new Promise(r => setTimeout(r, 20));
+  assert.match(u3.status().error, /not an MC Panel archive/);
+});
