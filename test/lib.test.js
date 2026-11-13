@@ -312,3 +312,17 @@ test('monitor: "stopped on purpose" alert is its own option, off by default', as
   assert.strictEqual(m.getConfig().stopped, true);
   srv.close();
 });
+
+test('downloads: Modrinth hash lookup identifies installed jars', async () => {
+  const { createDownloads } = require('../lib/downloads');
+  let sent = null;
+  const fake = async (url, opts) => {
+    sent = { url, body: JSON.parse(opts.body) };
+    return Response.json({ ['a'.repeat(40)]: { project_id: '9eGKb6K1' }, ['b'.repeat(40)]: { project_id: 'bad id!' } });
+  };
+  const d = createDownloads({ fetchImpl: fake });
+  const r = await d.identifyModrinth(['a'.repeat(40), 'b'.repeat(40), 'not-a-hash']);
+  assert.deepStrictEqual(r, { ['a'.repeat(40)]: '9eGKb6K1' });        // odd ids are dropped
+  assert.ok(sent.url.endsWith('/version_files') && sent.body.algorithm === 'sha1' && sent.body.hashes.length === 2);
+  assert.deepStrictEqual(await d.identifyModrinth([]), {});
+});

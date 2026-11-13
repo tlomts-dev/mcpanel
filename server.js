@@ -1410,6 +1410,45 @@ async function pluginMeta(full) {
   } catch { return {}; }
 }
 
+// Where each installed jar came from, so the browse tab can mark a project as installed exactly:
+// 1) what the panel itself installed (.panel-plugin-sources.json), 2) Modrinth's hash lookup for any other jar.
+const PLUGIN_SOURCES_FILE = path.join(SERVER_DIR, '.panel-plugin-sources.json');
+let pluginSources = {};
+try { pluginSources = JSON.parse(fs.readFileSync(PLUGIN_SOURCES_FILE, 'utf8')) || {}; } catch { pluginSources = {}; }
+function notePluginSource(file, source, id) {
+  pluginSources[String(file).replace(/\.disabled$/, '')] = source + ':' + id;
+  try { fs.writeFileSync(PLUGIN_SOURCES_FILE, JSON.stringify(pluginSources)); } catch {}
+}
+const sha1Cache = new Map();        // "file|size|mtime" -> sha1
+const modrinthIdCache = new Map();  // sha1 -> { id|null, at }
+async function pluginProjects(list) {
+  const want = [];
+  for (const p of list) {
+    const key = p.file + '|' + p.size + '|' + p.date;
+    if (!sha1Cache.has(key)) {
+      try { sha1Cache.set(key, crypto.createHash('sha1').update(await fsp.readFile(path.join(PLUGINS_DIR, p.file))).digest('hex')); } catch { sha1Cache.set(key, null); }
+    }
+    p.sha1 = sha1Cache.get(key);
+    const c = p.sha1 && modrinthIdCache.get(p.sha1);
+    if (p.sha1 && (!c || Date.now() - c.at > 6 * 3600000)) want.push(p.sha1);
+  }
+  if (want.length) {
+    try {
+      const found = await downloads.identifyModrinth(want);
+      for (const h of want) modrinthIdCache.set(h, { id: found[h] || null, at: Date.now() });
+    } catch {}   // offline: fall back to names in the browser
+  }
+  for (const p of list) {
+    const ids = [];
+    const rec = pluginSources[p.file.replace(/\.disabled$/, '')];
+    if (rec) ids.push(rec);
+    const c = p.sha1 && modrinthIdCache.get(p.sha1);
+    if (c && c.id && !ids.includes('modrinth:' + c.id)) ids.push('modrinth:' + c.id);
+    p.projects = ids;
+    delete p.sha1;
+  }
+}
+
 app.get('/api/plugins', async (_req, res) => {
   try {
     const files = (await fsp.readdir(PLUGINS_DIR)).filter(f => PLUGIN_FILE_RE.test(f)).slice(0, 300);
@@ -1418,6 +1457,7 @@ app.get('/api/plugins', async (_req, res) => {
       const full = path.join(PLUGINS_DIR, f), st = await fsp.stat(full);
       out.push({ file: f, enabled: !f.endsWith('.disabled'), size: st.size, date: st.mtimeMs, ...(await pluginMeta(full)) });
     }
+    await pluginProjects(out);
     out.sort((a, b) => (a.name || a.file).toLowerCase().localeCompare((b.name || b.file).toLowerCase()));
     res.json({ plugins: out, mcVersion: mcVersionOnly() });
   } catch { res.json({ plugins: [], mcVersion: mcVersionOnly() }); }
@@ -1447,8 +1487,12 @@ app.get('/api/plugins/search', async (req, res) => {
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
 app.post('/api/plugins/install', async (req, res) => {
-  const b = req.body || {};
-  try { res.json({ success: true, ...(await (b.source === 'hangar' ? downloads.installHangar : downloads.installPlugin)(b.id, mcVersionOnly(), PLUGINS_DIR)) }); }
+  const b = req.body || {}, src = b.source === 'hangar' ? 'hangar' : 'modrinth';
+  try {
+    const r = await (src === 'hangar' ? downloads.installHangar : downloads.installPlugin)(b.id, mcVersionOnly(), PLUGINS_DIR);
+    notePluginSource(r.file, src, String(b.id));
+    res.json({ success: true, ...r });
+  }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
 // ── Server jar: current version/build, update check, download a chosen build, one-click update ───────────
