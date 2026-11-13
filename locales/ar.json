@@ -906,5 +906,7 @@
  "ui.pl_update_confirm_title": "تحديث الإضافات؟",
  "ui.pl_update_confirm_body": "سيُستبدل بأحدث إصدار متوافق: {v0}. يُحفظ الملف القديم في .panel-old-plugins. أعد تشغيل السيرفر بعدها لتحميل الإصدار الجديد.",
  "ui.pl_updated_n": "حُدّثت {v0} إضافة. أعد تشغيل السيرفر لتحميلها.",
- "ui.pl_nothing_updated": "لا يوجد ما يُحدَّث"
+ "ui.pl_nothing_updated": "لا يوجد ما يُحدَّث",
+ "srv.invalid_jvm_flags": "معاملات JVM غير مسموحة: {v0}. استخدم معاملات بسيطة مثل -XX:+UseZGC (بلا مسافات أو علامات اقتباس أو رموز shell، ولا يُسمح بـ agent وOnError).",
+ "srv.backup_or_restore_in_progress": "نسخ احتياطي أو استرجاع جارٍ بالفعل"
 }

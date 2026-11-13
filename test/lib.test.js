@@ -327,3 +327,14 @@ test('downloads: Modrinth hash lookup identifies installed jars', async () => {
   assert.ok(sent.url.endsWith('/version_files') && sent.body.algorithm === 'sha1' && sent.body.hashes.length === 2);
   assert.deepStrictEqual(await d.identifyModrinth([]), {});
 });
+
+test('scheduler: a scheduled restart does not start a server that was stopped on purpose', async () => {
+  const { createScheduler } = require('../lib/scheduler');
+  let restarts = 0;
+  const tt = new Proxy({}, { get: (_, k) => (String(k).startsWith('ran') ? () => '' : String(k)) });
+  const sch = createScheduler({ file: path.join(tmp(), 's.json'), sanitizeCommand: x => x, log: () => {}, t: tt,
+    actions: { isRunning: () => false, restart: async () => { restarts++; return true; }, command: () => {}, backup: async () => ({}) } });
+  const r = sch.add({ type: 'restart', warn: 10, sched: { kind: 'daily', time: '04:00' } });
+  assert.strictEqual(await sch.runNow(r.task.id), 'skippedStopped');
+  assert.strictEqual(restarts, 0);
+});

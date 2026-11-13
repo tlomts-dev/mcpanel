@@ -99,6 +99,25 @@ function safePath(rel, baseDir = SERVER_DIR) {
   return target;
 }
 
+// The file manager must never reach the panel's own data: hidden files and folders (.panel-users.json with password
+// hashes and 2FA secrets, .panel-offsite.json with storage keys, .env, ...) and the panel's own code when it is
+// installed inside the server folder (for example /opt/minecraft/panel). Symlinks are resolved so they cannot point out.
+const PANEL_DIR = path.resolve(__dirname);
+function filePath(rel) {
+  if (typeof rel !== 'string') return null;
+  const abs = safePath(rel);
+  if (!abs) return null;
+  const parts = path.relative(SERVER_DIR, abs).split(path.sep).filter(Boolean);
+  if (parts.some(x => x.startsWith('.'))) return null;
+  const inside = (a, dir) => a === dir || a.startsWith(dir + path.sep);
+  if (PANEL_DIR !== SERVER_DIR && inside(abs, PANEL_DIR)) return null;
+  try {
+    const real = fs.realpathSync(abs), base = fs.realpathSync(SERVER_DIR);
+    if (!inside(real, base) || (PANEL_DIR !== SERVER_DIR && inside(real, fs.realpathSync(PANEL_DIR)))) return null;
+  } catch {}   // does not exist yet (new file): the checks above are enough
+  return abs;
+}
+
 const EDITABLE_EXT = new Set([
   '.properties', '.yml', '.yaml', '.json', '.txt', '.log',
   '.cfg', '.conf', '.toml', '.md', '.sh', '.bat', '.html', '.js', '.css'
@@ -286,14 +305,19 @@ function getWorldName() {
   try {
     const txt = fs.readFileSync(PROPS_FILE, 'utf8');
     const m = txt.match(/^level-name=(.*)$/m);
-    if (m && m[1].trim()) return m[1].trim();
+    const v = m && m[1].trim();
+    // level-name becomes part of file paths: a plain folder name only
+    if (v && /^[\w .-]{1,64}$/.test(v) && !v.startsWith('.')) return v;
   } catch {}
   return 'world';
 }
+// The world folders a backup contains: the configured world and its Nether and End.
+const worldDirs = () => { const w = getWorldName(); return [w, w + '_nether', w + '_the_end']; };
 
 // Minecraft 26.1+ moved per-player files into <world>/players/{data,stats,advancements}/.
 // Older versions keep them in <world>/{playerdata,stats,advancements}/. Support both layouts.
 function playerFilePath(world, kind, uuid) {
+  if (!/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(String(uuid || ''))) uuid = '00000000-0000-0000-0000-000000000000';
   const ext = kind === 'playerdata' ? '.dat' : '.json';
   const modern = path.join(SERVER_DIR, world, 'players', kind === 'playerdata' ? 'data' : kind, uuid + ext);
   const legacy = path.join(SERVER_DIR, world, kind, uuid + ext);
@@ -773,6 +797,17 @@ function loadStartupCfg() {
   catch { return { xms: '1G', xmx: '2G', g1gc: true, extraFlags: '' }; }
 }
 
+// Extra JVM flags end up inside the shell command that starts the server, so each one must be a plain flag:
+// no spaces, quotes, $, ;, |, & or backticks. Flags that make the JVM run other programs or load native/agent
+// code are refused as well, so the "edit settings" permission cannot be turned into running commands on the machine.
+const JVM_FLAG_RE = /^-[\w.:=+,/@%-]{1,200}$/;
+const JVM_FLAG_BLOCKED = /^-(XX:[+-]?On(OutOfMemory)?Error|XX:Flags|XX:VMOptionsFile|XX:CompileCommandFile|javaagent|agentpath|agentlib)/i;
+function parseJvmFlags(str) {
+  const flags = String(str || '').split(/\s+/).filter(Boolean);
+  const bad = flags.filter(f => !JVM_FLAG_RE.test(f) || JVM_FLAG_BLOCKED.test(f));
+  return { flags: flags.filter(f => !bad.includes(f)).slice(0, 40), bad };
+}
+
 function buildJvmArgs(cfg) {
   const args = [`-Xms${cfg.xms}`, `-Xmx${cfg.xmx}`];
   if (cfg.g1gc) args.push(
@@ -788,7 +823,7 @@ function buildJvmArgs(cfg) {
     '-XX:SurvivorRatio=32', '-XX:+PerfDisableSharedMem',
     '-XX:MaxTenuringThreshold=1'
   );
-  if (cfg.extraFlags) args.push(...cfg.extraFlags.split(/\s+/).filter(Boolean));
+  if (cfg.extraFlags) args.push(...parseJvmFlags(cfg.extraFlags).flags);   // also filters files saved by older versions
   return args;
 }
 
@@ -1223,13 +1258,13 @@ app.post('/api/players/delete-data', requireAuth, async (req, res) => {
 
 // ── Files API ─────────────────────────────────────────────────────────────────
 app.get('/api/files', requireAuth, async (req, res) => {
-  const rel = String(req.query.path || '');
-  const abs = safePath(rel);
+  const rel = typeof req.query.path === 'string' ? req.query.path : '';
+  const abs = filePath(rel);
   if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   try {
     const entries = await fsp.readdir(abs, { withFileTypes: true });
     const files = await Promise.all(entries
-      .filter(e => !e.name.startsWith('.'))
+      .filter(e => !e.name.startsWith('.') && filePath(path.relative(SERVER_DIR, path.join(abs, e.name))))
       .map(async e => {
         const full = path.join(abs, e.name);
         let size = 0, mtime = null;
@@ -1245,8 +1280,7 @@ app.get('/api/files', requireAuth, async (req, res) => {
 });
 
 app.get('/api/files/read', requireAuth, async (req, res) => {
-  const rel = String(req.query.path || '');
-  const abs = safePath(rel);
+  const abs = filePath(req.query.path);
   if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   try {
     const stat = await fsp.stat(abs);
@@ -1256,14 +1290,14 @@ app.get('/api/files/read', requireAuth, async (req, res) => {
     if (!EDITABLE_EXT.has(ext))    return res.status(415).json({ error: t('srv.file_type_cannot_be_edited') });
     const content = await fsp.readFile(abs, 'utf8');
     res.json({ content });
-  } catch { res.status(500).json({ error: t('srv.failed_to_read_the_file') }); }
+  } catch (e) { res.status(e && e.code === 'ENOENT' ? 404 : 500).json({ error: t('srv.failed_to_read_the_file') }); }
 });
 
 app.post('/api/files/write', requireAuth, async (req, res) => {
-  const rel = String(req.body.path || '');
-  const abs = safePath(rel);
+  const abs = filePath((req.body || {}).path);
   if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
-  const content = String(req.body.content ?? '');
+  if (typeof req.body.content !== 'string') return res.status(400).json({ error: t('srv.invalid_path') });
+  const content = req.body.content;
   if (content.length > MAX_EDIT_SIZE) return res.status(413).json({ error: t('srv.content_is_too_large') });
   const ext = path.extname(abs).toLowerCase();
   if (!EDITABLE_EXT.has(ext)) return res.status(415).json({ error: t('srv.file_type_cannot_be_edited') });
@@ -1274,23 +1308,36 @@ app.post('/api/files/write', requireAuth, async (req, res) => {
 });
 
 app.post('/api/files/upload', requireAuth, (req, res) => {
-  const relPath = decodeURIComponent(req.headers['x-path'] || '');
-  const fileName = decodeURIComponent(req.headers['x-filename'] || '');
-  const absDir = safePath(relPath);
-  if (!absDir) return res.status(400).json({ error: t('srv.invalid_path') });
-  const absFile = path.join(absDir, fileName);
-  if (!absFile.startsWith(SERVER_DIR)) return res.status(400).json({ error: t('srv.invalid_path') });
-
-  const writeStream = fs.createWriteStream(absFile);
-  req.pipe(writeStream);
-  req.on('end', () => res.json({ success: true }));
-  req.on('error', () => res.status(500).json({ error: t('srv.upload_failed') }));
+  let relPath, fileName;
+  try { relPath = decodeURIComponent(req.headers['x-path'] || ''); fileName = decodeURIComponent(req.headers['x-filename'] || ''); }
+  catch { return res.status(400).json({ error: t('srv.invalid_path') }); }
+  // a plain file name only: no folders, no "..", nothing hidden
+  if (!fileName || fileName.length > 200 || /[\\/\x00-\x1f]/.test(fileName) || fileName === '.' || fileName === '..')
+    return res.status(400).json({ error: t('srv.invalid_name') });
+  const absDir = filePath(relPath);
+  const absFile = absDir && filePath(path.relative(SERVER_DIR, path.join(absDir, fileName)));
+  if (!absFile || path.dirname(absFile) !== absDir) return res.status(400).json({ error: t('srv.invalid_path') });
+  let st = null;
+  try { st = fs.statSync(absFile); } catch {}
+  if (st && !st.isFile()) return res.status(409).json({ error: t('srv.a_file_folder_with_that_name_already_exists') });
+  // write to a temporary name and move it into place only when the whole upload arrived
+  const part = absFile + '.part-' + process.pid;
+  const ws = fs.createWriteStream(part);
+  let done = false;
+  const fail = () => { if (done) return; done = true; ws.destroy(); fs.unlink(part, () => {}); if (!res.headersSent) res.status(500).json({ error: t('srv.upload_failed') }); };
+  ws.on('error', fail);
+  req.on('error', fail);
+  req.on('aborted', fail);
+  ws.on('finish', () => {
+    if (done) return; done = true;
+    fs.rename(part, absFile, err => { if (err) { fs.unlink(part, () => {}); return res.status(500).json({ error: t('srv.upload_failed') }); } res.json({ success: true }); });
+  });
+  req.pipe(ws);
 });
 
 // ── تنزيل ملف ────────────────────────────────────────────────────────────────
 app.get('/api/files/download', requireAuth, async (req, res) => {
-  const rel = String(req.query.path || '');
-  const abs = safePath(rel);
+  const abs = filePath(req.query.path);
   if (!abs) return res.status(400).json({ error: t('srv.invalid_path') });
   try {
     const stat = await fsp.stat(abs);
@@ -1300,8 +1347,7 @@ app.get('/api/files/download', requireAuth, async (req, res) => {
 });
 
 app.post('/api/files/delete', requireAuth, async (req, res) => {
-  const rel = String(req.body.path || '');
-  const abs = safePath(rel);
+  const abs = filePath((req.body || {}).path);
   if (!abs)               return res.status(400).json({ error: t('srv.invalid_path') });
   if (abs === SERVER_DIR) return res.status(400).json({ error: t('srv.cannot_delete_the_root') });
   try {
@@ -1312,14 +1358,13 @@ app.post('/api/files/delete', requireAuth, async (req, res) => {
 
 // ── إعادة تسمية / نقل ملف أو مجلد ─────────────────────────────────────────────
 app.post('/api/files/rename', requireAuth, async (req, res) => {
-  const relFrom = String(req.body.path || '');
-  const newName = String(req.body.newName || '').trim();
-  const absFrom = safePath(relFrom);
+  const newName = typeof req.body.newName === 'string' ? req.body.newName.trim() : '';
+  const absFrom = filePath((req.body || {}).path);
   if (!absFrom)  return res.status(400).json({ error: t('srv.invalid_path') });
   if (!newName || /[\\/]/.test(newName) || newName === '.' || newName === '..')
     return res.status(400).json({ error: t('srv.invalid_name') });
   const absTo = path.join(path.dirname(absFrom), newName);
-  if (!safePath(path.relative(SERVER_DIR, absTo))) return res.status(400).json({ error: t('srv.invalid_target_path') });
+  if (absFrom === SERVER_DIR || !filePath(path.relative(SERVER_DIR, absTo))) return res.status(400).json({ error: t('srv.invalid_target_path') });
   try {
     if (fs.existsSync(absTo)) return res.status(409).json({ error: t('srv.a_file_folder_with_that_name_already_exists') });
     await fsp.rename(absFrom, absTo);
@@ -1689,7 +1734,7 @@ async function pruneBackups(keep) {
 async function createBackup(opts = {}) {
   if (typeof opts === 'number') opts = { keep: opts };
   const keep = opts.keep || 0;
-  if (backupBusy) throw new Error('__BUSY__');
+  if (backupBusy || restoreBusy) throw new Error('__BUSY__');
   backupBusy = true;
   const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   const name  = `backup-${stamp}.zip`;
@@ -1701,7 +1746,7 @@ async function createBackup(opts = {}) {
     const output  = fs.createWriteStream(out);
     const archive = new archiver.ZipArchive({ zlib: { level: 6 } });
     archive.pipe(output);
-    for (const w of ['world', 'world_nether', 'world_the_end']) {
+    for (const w of worldDirs()) {
       const p = path.join(SERVER_DIR, w);
       if (fs.existsSync(p)) archive.directory(p, w);
     }
@@ -1811,35 +1856,71 @@ app.post('/api/backups/create', requireAuth, async (req, res) => {
   }
 });
 
+// Restoring only ever writes what a panel backup contains (the worlds and the five config files), checks every
+// entry before touching anything, replaces each world folder as a whole (no leftovers from after the backup), and
+// puts the previous files back if anything fails half way.
+const RESTORE_FILES = ['server.properties', 'ops.json', 'whitelist.json', 'banned-players.json', 'banned-ips.json'];
+let restoreBusy = false;
+async function restoreBackup(file) {
+  const { pipeline } = require('stream/promises');
+  const zip = await unzipper.Open.file(file);
+  const RESTORE_TOP = new Set(['world', 'world_nether', 'world_the_end', ...worldDirs(), ...RESTORE_FILES]);
+  const entries = [];
+  for (const e of zip.files) {
+    const rel = String(e.path).replace(/\\/g, '/').replace(/^\.\//, '');
+    const parts = rel.split('/').filter(Boolean);
+    if (!parts.length) continue;
+    if (!RESTORE_TOP.has(parts[0]) || parts.some(x => x === '..' || x === '.') || rel.startsWith('/')) throw new Error('unexpected entry in archive: ' + rel.slice(0, 80));
+    const abs = safePath(parts.join('/'));
+    if (!abs) throw new Error('unexpected entry in archive: ' + rel.slice(0, 80));
+    entries.push({ e, abs, dir: e.type === 'Directory' || rel.endsWith('/') });
+  }
+  if (!entries.length) throw new Error('empty archive');
+  const tops = [...new Set(entries.map(x => path.relative(SERVER_DIR, x.abs).split(path.sep)[0]))];
+  const existed = new Set(tops.filter(x => fs.existsSync(path.join(SERVER_DIR, x))));
+  const stash = path.join(SERVER_DIR, '.panel-restore-old', String(Date.now()));
+  await fsp.mkdir(stash, { recursive: true });
+  const moved = [];
+  try {
+    for (const x of tops) if (existed.has(x)) { await fsp.rename(path.join(SERVER_DIR, x), path.join(stash, x)); moved.push(x); }
+    for (const { e, abs, dir } of entries) {
+      if (dir) { await fsp.mkdir(abs, { recursive: true }); continue; }
+      await fsp.mkdir(path.dirname(abs), { recursive: true });
+      await pipeline(e.stream(), fs.createWriteStream(abs));
+    }
+  } catch (err) {
+    for (const x of tops) {
+      if (moved.includes(x)) { await fsp.rm(path.join(SERVER_DIR, x), { recursive: true, force: true }).catch(() => {}); await fsp.rename(path.join(stash, x), path.join(SERVER_DIR, x)).catch(() => {}); }
+      else if (!existed.has(x)) await fsp.rm(path.join(SERVER_DIR, x), { recursive: true, force: true }).catch(() => {});
+    }
+    throw err;
+  }
+  await fsp.rm(stash, { recursive: true, force: true }).catch(() => {});
+}
+
 app.post('/api/backups/restore', requireAuth, async (req, res) => {
-  const name = String(req.body.name || '');
+  const name = typeof (req.body || {}).name === 'string' ? req.body.name : '';
   if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ error: t('srv.invalid_name') });
   const file = path.join(BACKUPS_DIR, name);
   if (!fs.existsSync(file))         return res.status(404).json({ error: t('srv.backup_not_found') });
+  if (restoreBusy || backupBusy)    return res.status(409).json({ error: t('srv.backup_or_restore_in_progress') });
+  restoreBusy = true;
 
-  if (isRunning()) {
-    intentionalStop = true; // إيقاف متعمد لإرجاع النسخة
-    sendCommand('stop');
-  }
-
-  const restore = async () => {
+  const run = async () => {
     try {
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(file).pipe(unzipper.Extract({ path: SERVER_DIR }))
-          .on('close', resolve).on('error', reject);
-      });
+      if (isRunning()) {
+        restartPending = false; intentionalStop = true;   // stopped on purpose for the restore
+        sendCommand('stop');
+        for (let i = 0; i < 90 && isRunning(); i++) await new Promise(r => setTimeout(r, 1000));
+        if (isRunning()) throw new Error(t('srv.panel_update_stop_timeout'));
+      }
+      await restoreBackup(file);
       broadcast({ type: 'log', data: `[Panel] Restored from ${name}\n` });
     } catch (e) {
       broadcast({ type: 'log', data: `[Panel] Restore failed: ${e.message}\n` });
-    }
+    } finally { restoreBusy = false; }
   };
-
-  if (isRunning()) {
-    const wait = setInterval(() => { if (!isRunning()) { clearInterval(wait); restore(); } }, 1000);
-    setTimeout(() => clearInterval(wait), 30000);
-  } else {
-    restore();
-  }
+  run();
   res.json({ success: true });
 });
 
@@ -1904,10 +1985,12 @@ app.get('/api/settings/startup', requireAuth, (_req, res) => {
 });
 
 app.post('/api/settings/startup', requireAuth, async (req, res) => {
-  const { xms, xmx, g1gc, extraFlags } = req.body;
-  const memRe = /^\d+[MG]$/;
-  if (!memRe.test(xms) || !memRe.test(xmx)) return res.status(400).json({ error: t('srv.invalid_memory_values') });
-  const cfg = { xms, xmx, g1gc: !!g1gc, extraFlags: String(extraFlags || '') };
+  const { xms, xmx, g1gc, extraFlags } = req.body || {};
+  const memRe = /^\d{1,6}[MG]$/;
+  if (typeof xms !== 'string' || typeof xmx !== 'string' || !memRe.test(xms) || !memRe.test(xmx)) return res.status(400).json({ error: t('srv.invalid_memory_values') });
+  const jf = parseJvmFlags(typeof extraFlags === 'string' ? extraFlags : '');
+  if (jf.bad.length) return res.status(400).json({ error: t('srv.invalid_jvm_flags', { v0: jf.bad.slice(0, 3).join(' ') }) });
+  const cfg = { xms, xmx, g1gc: !!g1gc, extraFlags: jf.flags.join(' ') };
   try {
     await fsp.writeFile(STARTUP_CFG, JSON.stringify(cfg, null, 2), 'utf8');
     res.json({ success: true });
@@ -2046,6 +2129,15 @@ if (isRunning()) {
   startTpsPolling();
   console.log(`[Panel] Attached to existing server (PID: ${mcPid || 'unknown'})`);
 }
+
+// ── Errors: bad JSON and the like get a short JSON answer, never an HTML page with a stack trace ─────────────
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError)) return res.status(400).json({ error: 'Invalid JSON' });
+  if (err && err.type === 'entity.too.large') return res.status(413).json({ error: t('srv.content_is_too_large') });
+  console.error('[Panel] Request error:', req.method, req.path, err && err.message);
+  res.status(500).json({ error: t('srv.operation_failed') });
+});
 
 // ── Listen ────────────────────────────────────────────────────────────────────
 server.listen(PORT, '0.0.0.0', () => {

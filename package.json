@@ -5,7 +5,6 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start:en": "node en/server.js",
     "test": "node --test test/"
   },
   "engines": {
