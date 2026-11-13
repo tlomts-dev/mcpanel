@@ -201,8 +201,8 @@ test('downloads: hosts, hashes, file names', async () => {
   const r = await d.installPlugin('abc', '1.21.8', dir);
   assert.strictEqual(r.file, 'Cool.jar');
   assert.ok(fs.existsSync(path.join(dir, 'Cool.jar')) && !fs.existsSync(path.join(dir, 'Cool.jar.part')));
-  assert.deepStrictEqual(await d.paperVersions(), ['1.21.8', '26.3']);   // pre-releases are filtered out
-  assert.strictEqual((await d.downloadPaper('1.21.8', dir)).file, 'paper-1.21.8.jar');
+  assert.deepStrictEqual(await d.paperVersions(), ['26.3', '1.21.8']);   // pre-releases are filtered out
+  assert.strictEqual((await d.downloadPaper('1.21.8', dir)).file, 'paper-1.21.8-7.jar');
   // a wrong hash must leave nothing behind
   versionsResp = [{ version_type: 'release', version_number: '1', files: [{ primary: true, filename: 'Bad.jar', url: 'https://cdn.modrinth.com/data/x/Bad.jar', hashes: { sha512: 'deadbeef' } }] }];
   await assert.rejects(d.installPlugin('abc', '1.21.8', dir), /checksum/);
@@ -230,4 +230,34 @@ test('tempbans: pardon after expiry, only while the server runs', () => {
   b.add('Alex', 5); b.remove('Alex');              // a later permanent ban/pardon cancels the timer
   t += 99 * 60000;
   assert.strictEqual(b.tick(), 0);
+});
+
+test('scheduler: friendly schedules compile to cron, one-time tasks run once', async () => {
+  const { createScheduler, compileSchedule, nextCron, parseCron } = require('../lib/scheduler');
+  assert.deepStrictEqual(compileSchedule({ kind: 'weekly', time: '04:30', days: [5, 1, 1, 3] }), { cron: '30 4 * * 1,3,5' });
+  assert.deepStrictEqual(compileSchedule({ kind: 'daily', time: '23:05' }), { cron: '5 23 * * *' });
+  assert.deepStrictEqual(compileSchedule({ kind: 'monthly', time: '00:10', dom: 15 }), { cron: '10 0 15 * *' });
+  assert.deepStrictEqual(compileSchedule({ kind: 'interval', every: 6, unit: 'hour' }), { cron: '0 */6 * * *' });
+  assert.deepStrictEqual(compileSchedule({ kind: 'interval', every: 15, unit: 'min' }), { cron: '*/15 * * * *' });
+  for (const bad of [{ kind: 'weekly', time: '04:30', days: [] }, { kind: 'weekly', time: '25:00', days: [1] }, { kind: 'interval', every: 0, unit: 'min' },
+    { kind: 'interval', every: 30, unit: 'hour' }, { kind: 'monthly', time: '04:00', dom: 32 }, { kind: 'once', at: 1000 }, { kind: 'cron', cron: 'nope' }, { kind: 'zzz' }, null])
+    assert.ok(compileSchedule(bad).error, JSON.stringify(bad));
+  const next = nextCron(parseCron('30 4 * * 1'), new Date(2026, 0, 5, 5, 0).getTime());   // Monday 05:00 -> next Monday
+  assert.strictEqual(new Date(next).getDay(), 1);
+  assert.strictEqual(new Date(next).getDate(), 12);
+
+  const ran = [];
+  const tt = new Proxy({}, { get: (_, k) => (k === 'ranGeneric' ? n => n : String(k)) });
+  const sch = createScheduler({ file: path.join(tmp(), 's.json'), actions: { isRunning: () => true, command: c => ran.push(c), backup: async () => ({}), restart: async () => true },
+    sanitizeCommand: x => String(x || '').trim() || null, log: () => {}, t: tt });
+  const r1 = sch.add({ type: 'broadcast', name: 'once', arg: 'hi', sched: { kind: 'once', at: Date.now() + 3600000 }, autoDelete: false });
+  assert.ok(r1.task && r1.task.at && !r1.task.cron, JSON.stringify(r1));
+  assert.ok(sch.list()[0].nextRun === r1.task.at);
+  assert.ok(sch.add({ type: 'broadcast', arg: 'x', sched: { kind: 'once', at: Date.now() - 3600000 } }).error);   // in the past
+  const r2 = sch.add({ type: 'command', arg: 'save-all', sched: { kind: 'weekly', time: '04:00', days: [0, 6] } });
+  assert.strictEqual(r2.task.cron, '0 4 * * 0,6');
+  assert.deepStrictEqual(r2.task.sched, { kind: 'weekly', time: '04:00', days: [0, 6] });
+  assert.ok(sch.add({ type: 'command', arg: 'save-all', cron: '*/5 * * * *' }).task);   // old clients that only send cron still work
+  assert.strictEqual(await sch.runNow(r2.task.id), 'ok');
+  assert.deepStrictEqual(ran, ['save-all']);
 });

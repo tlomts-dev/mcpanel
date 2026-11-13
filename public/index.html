@@ -312,6 +312,14 @@ select.sel:focus{border-color:var(--accent2);}
 .dash-det{min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);}
 .dash-det summary{cursor:pointer;padding:7px 12px;font-size:12px;font-weight:700;color:var(--text2);}
 .dash-det-body{padding:4px 12px 12px;}
+.jar-now{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:13px;}
+.jar-k{color:var(--muted);margin-inline-end:6px;font-size:12px;}
+.jar-status{margin-top:10px;font-size:13px;padding:8px 12px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border);color:var(--text2);}
+.jar-status.ok{border-color:var(--accent);}
+.jar-status.new{border-color:var(--warn);color:var(--warn);}
+.sch-when{margin-top:6px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);}
+.sch-lbl{font-size:12px;color:var(--muted);align-self:center;min-width:70px;}
+.sch-f{margin-top:8px;}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;}
 .quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font),sans-serif;transition:.15s;text-align:center;}
 .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -889,12 +897,28 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <input class="inp" id="sch-name" maxlength="40" placeholder="@@ui.task_name_optional@@">
         </div>
         <div class="inp-row">
-          <select class="inp" id="sch-preset" onchange="schPresetChanged()" style="max-width:220px;"><option value="*/30 * * * *">@@ui.every_30_minutes@@</option><option value="0 * * * *">@@ui.every_hour@@</option><option value="0 */6 * * *">@@ui.every_6_hours@@</option><option value="0 4 * * *">@@ui.daily_at_04_00@@</option><option value="0 4 * * 0">@@ui.weekly_sunday_04_00@@</option><option value="">@@ui.custom_schedule@@</option></select>
-          <input class="inp" id="sch-cron" value="*/30 * * * *" dir="ltr" style="max-width:180px;font-family:'IBM Plex Mono',monospace;">
           <input class="inp" id="sch-arg" maxlength="200" style="display:none;">
           <input class="inp" id="sch-num" type="number" min="0" max="1000" value="7" style="max-width:240px;">
-          <button class="btn btn-primary" onclick="addSchedule()">@@ui.add_task@@</button>
         </div>
+        <div class="sch-when">
+          <div class="inp-row">
+            <select class="inp" id="sch-kind" onchange="schKindChanged()" style="max-width:260px;">
+              <option value="daily">@@ui.sch_kind_daily@@</option><option value="weekly">@@ui.sch_kind_weekly@@</option>
+              <option value="interval">@@ui.sch_kind_interval@@</option><option value="monthly">@@ui.sch_kind_monthly@@</option>
+              <option value="once">@@ui.sch_kind_once@@</option><option value="cron">@@ui.sch_kind_cron@@</option>
+            </select>
+          </div>
+          <div class="inp-row sch-f" data-k="daily,weekly,monthly"><span class="sch-lbl">@@ui.sch_at_time@@</span><input class="inp" id="sch-time" type="time" value="04:00" style="max-width:140px;"></div>
+          <div class="sch-f" data-k="weekly"><div class="chip-row" id="sch-days"></div></div>
+          <div class="inp-row sch-f" data-k="monthly"><span class="sch-lbl">@@ui.sch_dom@@</span><input class="inp" id="sch-dom" type="number" min="1" max="31" value="1" style="max-width:100px;"></div>
+          <div class="inp-row sch-f" data-k="interval"><span class="sch-lbl">@@ui.sch_every@@</span><input class="inp" id="sch-every" type="number" min="1" max="59" value="6" style="max-width:100px;"><select class="inp" id="sch-unit" style="max-width:140px;"><option value="hour">@@ui.sch_unit_hour@@</option><option value="min">@@ui.sch_unit_min@@</option></select></div>
+          <div class="inp-row sch-f" data-k="once"><span class="sch-lbl">@@ui.sch_at@@</span><input class="inp" id="sch-at" type="datetime-local" style="max-width:240px;"><label class="chip"><input type="checkbox" id="sch-autodel"> @@ui.sch_autodelete@@</label></div>
+          <div class="inp-row sch-f" data-k="cron">
+            <select class="inp" id="sch-preset" onchange="schPresetChanged()" style="max-width:220px;"><option value="*/30 * * * *">@@ui.every_30_minutes@@</option><option value="0 * * * *">@@ui.every_hour@@</option><option value="0 */6 * * *">@@ui.every_6_hours@@</option><option value="0 4 * * *">@@ui.daily_at_04_00@@</option><option value="0 4 * * 0">@@ui.weekly_sunday_04_00@@</option><option value="">@@ui.custom_schedule@@</option></select>
+            <input class="inp" id="sch-cron" value="*/30 * * * *" dir="ltr" style="max-width:180px;font-family:'IBM Plex Mono',monospace;">
+          </div>
+        </div>
+        <div class="inp-row" style="margin-top:6px;"><button class="btn btn-primary" onclick="addSchedule()">@@ui.add_task@@</button></div>
         <div id="sch-backup-opts" style="margin-top:10px;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">@@ui.sch_dests_hint@@</div>
           <div class="chip-row" id="sch-dests"></div>
@@ -1043,10 +1067,35 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
 
       <div class="sub-page" id="settings-jar">
         <div class="card">
-          <div class="card-title" style="margin-bottom:6px;">@@ui.download_paper@@</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.downloads_the_latest_stable_build_of_officia@@ <span id="jar-current" dir="ltr"></span>)</div>
-          <div class="inp-row"><select class="inp" id="jar-version" style="max-width:200px;"></select><button class="btn btn-primary" style="flex:0 0 auto;" id="jar-go" onclick="downloadJar()">@@ui.download_2@@</button></div>
-          <label style="font-size:13px;"><input type="checkbox" id="jar-eula"> @@ui.i_accept_the_minecraft_eula_aka_ms_minecraft@@</label>
+          <div class="card-title" style="margin-bottom:10px;">@@ui.jar_title@@</div>
+          <div class="jar-now">
+            <div><span class="jar-k">@@ui.jar_current@@</span><b id="jar-mc" dir="ltr">—</b></div>
+            <div><span class="jar-k">@@ui.jar_build@@</span><b id="jar-build" dir="ltr">—</b></div>
+            <div><span class="jar-k">@@ui.file_2@@</span><b id="jar-current" dir="ltr">—</b></div>
+          </div>
+          <div class="jar-status" id="jar-status"></div>
+          <div class="inp-row" style="margin-top:10px;">
+            <button class="btn btn-ghost" onclick="checkJarUpdate(true)">@@ui.jar_check@@</button>
+            <button class="btn btn-primary" id="jar-update-now" style="display:none;" onclick="jarUpdateNow()">@@ui.jar_update_now@@</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:6px;">@@ui.jar_pick_title@@</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.jar_pick_hint@@</div>
+          <div class="inp-row">
+            <select class="inp" id="jar-version" onchange="loadJarBuilds()" style="max-width:170px;"></select>
+            <select class="inp" id="jar-build-sel" style="max-width:300px;"><option value="">@@ui.jar_latest_build@@</option></select>
+          </div>
+          <div class="chip-row" style="margin:6px 0 10px;">
+            <label class="chip"><input type="checkbox" id="jar-backup" checked> @@ui.jar_backup_first@@</label>
+            <label class="chip"><input type="checkbox" id="jar-restart" checked> @@ui.jar_restart_after@@</label>
+            <label class="chip"><input type="checkbox" id="jar-eula"> @@ui.i_accept_the_minecraft_eula_aka_ms_minecraft@@</label>
+          </div>
+          <div class="inp-row">
+            <button class="btn btn-ghost" id="jar-dl" onclick="downloadJar(false)">@@ui.jar_download_only@@</button>
+            <button class="btn btn-primary" id="jar-go" onclick="downloadJar(true)">@@ui.jar_download_apply@@</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;">@@ui.jar_old_kept@@</div>
         </div>
       </div>
 
@@ -1723,28 +1772,45 @@ function schTypeChanged(){var t=document.getElementById('sch-type').value,arg=do
   arg.style.display=(t==='command'||t==='broadcast')?'':'none';arg.placeholder=t==='command'?T('ui.sch_cmd_ph'):T('ui.sch_msg_ph');
   num.style.display=(t==='backup'||t==='restart')?'':'none';num.placeholder=t==='backup'?T('ui.sch_keep_ph'):T('ui.sch_warn_ph');num.title=num.placeholder;num.value=t==='backup'?7:60;
   var o=document.getElementById('sch-backup-opts');if(o)o.style.display=t==='backup'?'':'none';}
+function schKindChanged(){var k=document.getElementById('sch-kind').value;document.querySelectorAll('.sch-f').forEach(function(e){e.style.display=e.dataset.k.split(',').indexOf(k)>-1?'':'none';});}
+function schDayName(d){try{return new Date(2024,0,7+d).toLocaleDateString(document.documentElement.lang||undefined,{weekday:'short'});}catch(e){return ''+d;}}
+function buildSchDays(){var box=document.getElementById('sch-days');if(!box||box.childElementCount)return;[6,0,1,2,3,4,5].forEach(function(d){var l=document.createElement('label'),c=document.createElement('input');l.className='chip';c.type='checkbox';c.value=d;l.appendChild(c);l.appendChild(document.createTextNode(' '+schDayName(d)));box.appendChild(l);});}
 function schPresetChanged(){var v=document.getElementById('sch-preset').value;if(v)document.getElementById('sch-cron').value=v;}
 async function loadSchedule(){try{var d=await fetch('/api/schedule').then(function(r){return r.json();});renderSchedule(d.tasks||[]);}catch(e){}}
 function schDestText(t){var ids=Array.isArray(t.dests)?t.dests:destCache.filter(function(d){return d.enabled&&d.auto;}).map(function(d){return d.id;});
   var names=ids.map(function(i){var d=destById(i);return d?d.name:null;}).filter(Boolean);
   return ' · '+(names.length?T('ui.sch_sends_to',{v0:names.join(', ')})+(t.keepLocal===false?T('ui.sch_no_local'):''):T('ui.sch_local_only_label'));}
+function schWhen(t){var s=t.sched||{kind:'cron',cron:t.cron};
+  if(s.kind==='once')return T('ui.sch_when_once',{v0:new Date(t.at||s.at).toLocaleString()});
+  if(s.kind==='interval')return T(s.unit==='min'?'ui.sch_when_interval_min':'ui.sch_when_interval_hour',{v0:s.every});
+  if(s.kind==='daily')return T('ui.sch_when_daily',{v0:s.time});
+  if(s.kind==='weekly')return T('ui.sch_when_weekly',{v0:s.time,v1:(s.days||[]).map(schDayName).join(', ')});
+  if(s.kind==='monthly')return T('ui.sch_when_monthly',{v0:s.time,v1:s.dom});
+  return t.cron;}
 function renderSchedule(tasks){var list=document.getElementById('sch-list');if(!list)return;list.textContent='';
   if(!tasks.length){var e=document.createElement('div');e.style.cssText='text-align:center;color:var(--muted);padding:18px;font-size:13px;';e.textContent=T('ui.no_scheduled_tasks_yet');list.appendChild(e);return;}
   tasks.forEach(function(t){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';
     var info=document.createElement('div');info.style.cssText='flex:1;min-width:200px;';
     var n=document.createElement('div');n.className='backup-name';n.textContent=t.name;
-    var b=document.createElement('span');b.className='badge '+(t.enabled?'badge-on':'badge-off');b.style.margin='0 6px';b.textContent=t.enabled?T('ui.enabled_2'):T('ui.paused');n.appendChild(b);
+    var b=document.createElement('span');b.className='badge '+(t.enabled?'badge-on':'badge-off');b.style.margin='0 6px';if(t.done){b.className='badge badge-off';b.style.margin='0 6px';b.textContent=T('ui.sch_done');}else b.textContent=t.enabled?T('ui.enabled_2'):T('ui.paused');n.appendChild(b);
     var extra=t.type==='backup'?(t.keep?T('ui.keeps_last')+t.keep+T('ui.backups'):'')+schDestText(t):t.type==='restart'?T('ui.warns')+t.warn+T('ui.s'):' · '+t.arg;
     var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';
-    m.textContent=SCH_LABEL[t.type]+' · '+t.cron+extra+T('ui.last_run')+(t.lastRun?new Date(t.lastRun).toLocaleString()+' ('+t.lastStatus+')':T('ui.never_ran'));
+    m.textContent=SCH_LABEL[t.type]+' · '+schWhen(t)+extra+(t.nextRun?' · '+T('ui.sch_next',{v0:new Date(t.nextRun).toLocaleString()}):'')+T('ui.last_run')+(t.lastRun?new Date(t.lastRun).toLocaleString()+' ('+t.lastStatus+')':T('ui.never_ran'));
     info.appendChild(n);info.appendChild(m);row.appendChild(info);
     var acts=document.createElement('div');acts.style.cssText='display:flex;gap:6px;';
     function mk(txt,fn,cls){var x=document.createElement('button');x.className='btn '+(cls||'btn-ghost');x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=txt;x.onclick=fn;acts.appendChild(x);}
-    mk(t.enabled?T('ui.pause'):T('ui.enable'),function(){schToggle(t.id,!t.enabled);});
+    if(!t.done)mk(t.enabled?T('ui.pause'):T('ui.enable'),function(){schToggle(t.id,!t.enabled);});
     mk(T('ui.run_now'),function(){schRun(t.id);});
     mk(T('ui.delete_3'),function(){schDelete(t.id);},'btn-ghost');
     row.appendChild(acts);list.appendChild(row);});}
-async function addSchedule(){var t=document.getElementById('sch-type').value,body={type:t,name:document.getElementById('sch-name').value,cron:document.getElementById('sch-cron').value};
+async function addSchedule(){var t=document.getElementById('sch-type').value,k=document.getElementById('sch-kind').value,body={type:t,name:document.getElementById('sch-name').value},sc={kind:k};
+  if(k==='daily'||k==='weekly'||k==='monthly')sc.time=document.getElementById('sch-time').value;
+  if(k==='weekly'){sc.days=Array.prototype.filter.call(document.querySelectorAll('#sch-days input'),function(c){return c.checked;}).map(function(c){return +c.value;});if(!sc.days.length){toast(T('ui.sch_pick_day'),'err');return;}}
+  if(k==='monthly')sc.dom=document.getElementById('sch-dom').value;
+  if(k==='interval'){sc.every=document.getElementById('sch-every').value;sc.unit=document.getElementById('sch-unit').value;}
+  if(k==='once'){var at=document.getElementById('sch-at').value;if(!at){toast(T('ui.sch_pick_date'),'err');return;}sc.at=new Date(at).getTime();body.autoDelete=document.getElementById('sch-autodel').checked;}
+  if(k==='cron')sc.cron=document.getElementById('sch-cron').value;
+  body.sched=sc;
   if(t==='backup')body.keep=document.getElementById('sch-num').value;else if(t==='restart')body.warn=document.getElementById('sch-num').value;else body.arg=document.getElementById('sch-arg').value;
   if(t==='backup'){body.dests=checkedDests('sch-dests');body.keepLocal=document.getElementById('sch-keeplocal').checked;}
   try{await apiPost('/api/schedule',body);toast(T('ui.task_added'));document.getElementById('sch-name').value='';document.getElementById('sch-arg').value='';loadSchedule();}catch(e){toast(e.message,'err');}}
@@ -2017,10 +2083,29 @@ async function searchPlugins(){var q=document.getElementById('pl-q').value.trim(
       x.onclick=async function(){x.disabled=true;x.textContent=T('ui.text_3');try{var r=await apiPost('/api/plugins/install',{id:h.id});toast(T('ui.installed')+r.file+T('ui.restart_the_server_to_load_it'));await loadPlugins();x.className='btn btn-ghost';x.textContent='✓ '+T('ui.pl_installed_badge');}catch(e){toast(e.message,'err');x.disabled=false;x.textContent=T('ui.install');}};
       row.appendChild(x);box.appendChild(row);});
   }catch(e){box.textContent='';toast(e.message,'err');}}
-async function loadJarVersions(){try{var d=await fetch('/api/jars/paper').then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;});document.getElementById('jar-current').textContent=d.current||'';
-  var sel=document.getElementById('jar-version');sel.textContent='';d.versions.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});}catch(e){toast(e.message,'err');}}
-async function downloadJar(){var b=document.getElementById('jar-go'),v=document.getElementById('jar-version').value;if(!v)return;b.disabled=true;b.textContent=T('ui.text_3');
-  try{var r=await apiPost('/api/jars/paper',{version:v,eula:document.getElementById('jar-eula').checked});toast(T('ui.downloaded')+r.file+T('ui.then_set_mc_jar_in_env'));}catch(e){toast(e.message,'err');}finally{b.disabled=false;b.textContent=T('ui.download_2');}}
+async function jarGet(url){var r=await fetch(url),j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j;}
+async function loadJarVersions(){try{var d=await jarGet('/api/jars/paper');
+  document.getElementById('jar-current').textContent=d.current||'—';document.getElementById('jar-mc').textContent=d.mc||'—';document.getElementById('jar-build').textContent=d.build!=null?d.build:'—';
+  var sel=document.getElementById('jar-version'),keep=sel.value||d.mc;sel.textContent='';d.versions.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v+(v===d.mc?' ✓':'');sel.appendChild(o);});
+  if(keep&&d.versions.indexOf(keep)>-1)sel.value=keep;loadJarBuilds();checkJarUpdate(false);}catch(e){toast(e.message,'err');}}
+async function loadJarBuilds(){var v=document.getElementById('jar-version').value,sel=document.getElementById('jar-build-sel');sel.textContent='';
+  var o=document.createElement('option');o.value='';o.textContent=T('ui.jar_latest_build');sel.appendChild(o);if(!v)return;
+  try{var d=await jarGet('/api/jars/paper/builds?version='+encodeURIComponent(v));d.builds.forEach(function(b){var x=document.createElement('option');x.value=b.id;x.textContent='#'+b.id+' · '+b.channel+(b.time?' · '+new Date(b.time).toLocaleDateString():'');sel.appendChild(x);});}catch(e){}}
+async function checkJarUpdate(force){var st=document.getElementById('jar-status'),btn=document.getElementById('jar-update-now');st.className='jar-status';st.textContent='…';btn.style.display='none';
+  try{var d=await jarGet('/api/jars/update-check'+(force?'?force=1':''));
+    if(!d.mc||d.build==null){st.textContent=T('ui.jar_unknown_build');return;}
+    if(d.updateAvailable){st.className='jar-status new';st.textContent=T('ui.jar_update_available',{v0:d.latestBuild,v1:d.build})+(d.channel?' ('+d.channel+')':'');btn.style.display='';btn.dataset.v=d.mc;btn.dataset.b=d.latestBuild;}
+    else{st.className='jar-status ok';st.textContent=T('ui.jar_uptodate',{v0:d.mc,v1:d.build});}
+    if(d.newerVersion)st.textContent+=' · '+T('ui.jar_newer_version',{v0:d.newerVersion});
+  }catch(e){st.textContent=e.message;}}
+function jarUpdateNow(){var b=document.getElementById('jar-update-now');jarRun(b.dataset.v,b.dataset.b,true);}
+function jarRun(v,build,apply){var backup=document.getElementById('jar-backup').checked,restart=document.getElementById('jar-restart').checked;
+  var go=async function(){var btns=['jar-go','jar-dl','jar-update-now'].map(function(i){return document.getElementById(i);});btns.forEach(function(x){x.disabled=true;});
+    try{var r=await apiPost('/api/jars/paper',{version:v,build:build||undefined,apply:apply,backup:backup,restart:restart,eula:document.getElementById('jar-eula').checked});
+      toast(apply?T('ui.jar_applying'):T('ui.downloaded')+r.file);setTimeout(function(){loadJarVersions();},apply?20000:500);}
+    catch(e){toast(e.message,'err');}finally{btns.forEach(function(x){x.disabled=false;});}};
+  if(apply)confirm2(T('ui.jar_confirm_title'),T('ui.jar_confirm_body',{v0:v+(build?' #'+build:'')}),go);else go();}
+function downloadJar(apply){var v=document.getElementById('jar-version').value;if(!v)return;jarRun(v,document.getElementById('jar-build-sel').value,apply);}
 
 // ════════════ HISTORY + ALERTS ════════════
 var histData=null,histTimer=null;
@@ -2077,7 +2162,7 @@ function showPage(name){
     if(name==='overview')loadHistory();
     if(name==='files')loadFiles(currentFilePath);
     if(name==='backups'){loadBackups();loadDestinations();}
-    if(name==='schedule'){loadSchedule();loadDestinations();schTypeChanged();}
+    if(name==='schedule'){loadSchedule();loadDestinations();schTypeChanged();buildSchDays();schKindChanged();}
     if(name==='players')loadAllPlayers();
     if(name==='account')renderAccount();
     if(name==='settings'&&can('settings.view')){loadProps();loadStartupSettings();}

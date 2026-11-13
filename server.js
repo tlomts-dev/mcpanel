@@ -570,6 +570,30 @@ function extractPlayerName(segment) {
   return parts.length ? parts[parts.length - 1] : '';
 }
 
+// The Minecraft version. Normally learned from the startup log line; when the panel was restarted while the
+// server kept running that line was never seen, so fall back to the log file, Paper's version_history.json,
+// and finally the version number in the jar's file name.
+function detectVersion() {
+  if (serverVersion) return serverVersion;
+  const found = v => { serverVersion = v; return v; };
+  try {
+    const fd = fs.openSync(MC_LOG_FILE, 'r');
+    try {
+      const size = fs.fstatSync(fd).size, len = Math.min(size, 400000), buf = Buffer.alloc(len);
+      fs.readSync(fd, buf, 0, len, size - len);
+      const all = [...buf.toString('utf8').matchAll(/Starting minecraft server version (\S+)/gi)];
+      if (all.length) return found(all[all.length - 1][1]);
+    } finally { fs.closeSync(fd); }
+  } catch {}
+  try {
+    const h = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'version_history.json'), 'utf8'));
+    const m = /MC:\s*(\d+\.\d+(?:\.\d+)?)/.exec(String(h.currentVersion || ''));
+    if (m) return found(m[1]);
+  } catch {}
+  const jm = /(\d+\.\d+(?:\.\d+)?)/.exec(SERVER_JAR || '');
+  return jm ? jm[1] : null;
+}
+
 function parseLogLine(line) {
   const vm = line.match(/Starting minecraft server version (.+)/i);
   if (vm) { serverVersion = vm[1].trim(); broadcast({ type: 'info', version: serverVersion }); }
@@ -883,7 +907,7 @@ app.get('/api/audit', (_req, res) => res.json({ entries: auth.readAudit(200) }))
 
 app.get('/api/status', requireAuth, (_req, res) => res.json({
   running: isRunning(),
-  version: serverVersion,
+  version: detectVersion(),
   uptime:  serverStartTime ? Date.now() - serverStartTime : null,
   tps:     lastTps,
   pid:     mcPid || null,
@@ -942,7 +966,7 @@ app.get('/api/info', requireAuth, async (_req, res) => {
 
   res.json({
     running:   isRunning(),
-    version:   serverVersion,
+    version:   detectVersion(),
     jar:       SERVER_JAR,
     serverDir: SERVER_DIR,
     pid:       mcPid || null,
@@ -1307,7 +1331,7 @@ const PLUGINS_DIR = path.join(SERVER_DIR, 'plugins');
 const PLUGIN_FILE_RE = /^[\w.+ -]{1,120}\.jar(\.disabled)?$/;
 const DL_ERRORS = new Set(["no compatible version", "checksum mismatch", "file too large", "blocked host", "bad file name", "bad project", "bad version", "no file", "no download"]);
 const dlError = e => (e && DL_ERRORS.has(e.message)) ? t('srv.dl_' + e.message.replace(/ /g, '_')) : ((e && e.message) || t('srv.operation_failed'));
-const mcVersionOnly = () => ((serverVersion || '').match(/\d+\.\d+(?:\.\d+)?/) || [null])[0];
+const mcVersionOnly = () => ((detectVersion() || '').match(/\d+\.\d+(?:\.\d+)?/) || [null])[0];
 
 async function pluginMeta(full) {
   try {
@@ -1360,19 +1384,88 @@ app.post('/api/plugins/install', async (req, res) => {
   try { res.json({ success: true, ...(await downloads.installPlugin((req.body || {}).id, mcVersionOnly(), PLUGINS_DIR)) }); }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
+// ── Server jar: current version/build, update check, download a chosen build, one-click update ───────────
+function currentBuild() {
+  try {
+    const h = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'version_history.json'), 'utf8'));
+    const m = /Paper-(\d+)/i.exec(String(h.currentVersion || ''));
+    if (m) return Number(m[1]);
+  } catch {}
+  const jm = /-(\d+)\.jar$/.exec(SERVER_JAR || '');
+  return jm ? Number(jm[1]) : null;
+}
+let updateCache = { at: 0, data: null };
+async function checkUpdate(force) {
+  if (!force && updateCache.data && Date.now() - updateCache.at < 10 * 60000) return updateCache.data;
+  const mc = mcVersionOnly(), build = currentBuild();
+  const data = { mc, build, jar: SERVER_JAR, latestBuild: null, newerVersion: null, updateAvailable: false };
+  const versions = await downloads.paperVersions();
+  if (mc) {
+    try { const l = await downloads.paperLatest(mc); data.latestBuild = l.id; data.channel = l.channel; } catch {}
+    data.updateAvailable = build != null && data.latestBuild != null && data.latestBuild > build;
+    const cmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 4; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+    if (versions.length && cmp(versions[0], mc) > 0) data.newerVersion = versions[0];
+  }
+  data.versions = versions;
+  updateCache = { at: Date.now(), data };
+  return data;
+}
 app.get('/api/jars/paper', async (_req, res) => {
-  try { res.json({ versions: await downloads.paperVersions(), current: SERVER_JAR }); }
+  try { res.json({ versions: await downloads.paperVersions(), current: SERVER_JAR, mc: mcVersionOnly(), build: currentBuild() }); }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
-app.post('/api/jars/paper', async (req, res) => {
-  const b = req.body || {};
+app.get('/api/jars/paper/builds', async (req, res) => {
+  try { res.json({ builds: await downloads.paperBuilds(String(req.query.version || '')) }); }
+  catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+app.get('/api/jars/update-check', async (req, res) => {
+  try { res.json(await checkUpdate(req.query.force === '1')); }
+  catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+
+let jarUpdateBusy = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Runs after the HTTP reply: backup -> stop -> replace the jar (the old one is kept) -> start again.
+async function applyJarUpdate(newFile, { backup, restart }) {
   try {
-    const r = await downloads.downloadPaper(b.version, SERVER_DIR);
+    if (backup) {
+      broadcast({ type: 'log', data: t('srv.panel_update_backing_up') + '\n' });
+      await createBackup({ keep: 0 });
+    }
+    if (isRunning()) {
+      broadcast({ type: 'log', data: t('srv.panel_update_stopping') + '\n' });
+      restartPending = false; intentionalStop = true; sendCommand('stop');
+      for (let i = 0; i < 90 && isRunning(); i++) await sleep(1000);
+      if (isRunning()) throw new Error(t('srv.panel_update_stop_timeout'));
+    }
+    const target = path.join(SERVER_DIR, SERVER_JAR), src = path.join(SERVER_DIR, newFile);
+    if (path.resolve(target) !== path.resolve(src)) {
+      const oldDir = path.join(SERVER_DIR, '.panel-old-jars');
+      await fsp.mkdir(oldDir, { recursive: true });
+      if (fs.existsSync(target)) await fsp.rename(target, path.join(oldDir, SERVER_JAR + '.' + Date.now()));
+      await fsp.copyFile(src, target);
+    }
+    broadcast({ type: 'log', data: t('srv.panel_update_done', { v0: newFile }) + '\n' });
+    updateCache = { at: 0, data: null }; serverVersion = null;
+    if (restart) { intentionalStop = false; startMC(); }
+  } catch (e) {
+    broadcast({ type: 'log', data: t('srv.panel_update_failed') + e.message + '\n' });
+  } finally { jarUpdateBusy = false; }
+}
+app.post('/api/jars/paper', async (req, res) => {
+  const b = req.body || {}, user = req.session && req.session.user;
+  const apply = b.apply === true;
+  if (apply && !(auth.has(user, 'server.stop') && auth.has(user, 'server.start'))) return res.status(403).json({ error: t('srv.you_do_not_have_permission_for_this_action') });
+  if (apply && b.backup !== false && !auth.has(user, 'backups.create')) return res.status(403).json({ error: t('srv.you_do_not_have_permission_for_this_action') });
+  if (jarUpdateBusy) return res.status(409).json({ error: t('srv.panel_update_busy') });
+  try {
+    const r = await downloads.downloadPaper(b.version, SERVER_DIR, b.build);
     if (b.eula === true) {
       await fsp.writeFile(path.join(SERVER_DIR, 'eula.txt'), '# Accepted by the panel user (https://aka.ms/MinecraftEULA)\neula=true\n');
       broadcast({ type: 'log', data: t('srv.panel_eula_accepted_at_your_request') + '\n' });
     }
-    res.json({ success: true, ...r });
+    if (apply) { jarUpdateBusy = true; applyJarUpdate(r.file, { backup: b.backup !== false, restart: b.restart !== false && isRunning() }); }
+    res.json({ success: true, applying: apply, ...r });
   } catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
 
@@ -1463,7 +1556,7 @@ const scheduler = createScheduler({
     restart: warn => restartWithCountdown(warn),
   },
   t: {
-    get badType() { return t('srv.invalid_task_type'); }, get badCron() { return t('srv.invalid_cron_schedule'); }, get badArg() { return t('srv.invalid_text_or_command'); }, get tooMany() { return t('srv.task_limit_reached_50'); }, get notFound() { return t('srv.task_not_found'); },
+    get badType() { return t('srv.invalid_task_type'); }, get badCron() { return t('srv.invalid_cron_schedule'); }, get badSchedule() { return t('srv.invalid_schedule'); }, get missed() { return t('srv.missed_server_was_down'); }, get badArg() { return t('srv.invalid_text_or_command'); }, get tooMany() { return t('srv.task_limit_reached_50'); }, get notFound() { return t('srv.task_not_found'); },
     get alreadyRunning() { return t('srv.task_is_already_running'); }, get skippedBusy() { return t('srv.skipped_restart_already_in_progress'); }, get skippedStopped() { return t('srv.skipped_server_is_stopped'); },
     ranBackup: (n, b, r) => t('srv.panel_scheduled_task_v0_backup_v1',{v0:n,v1:b}) + (r ? t('srv.old_removed_suffix',{v0:r}) : '') + '\n',
     ranRestart: (n, w) => t('srv.panel_scheduled_task_v0_restarting_in_v1_s',{v0:n,v1:w}),
@@ -1634,7 +1727,7 @@ wss.on('connection', ws => {
   ws.send(JSON.stringify({
     type:    'status',
     running: isRunning(),
-    version: serverVersion,
+    version: detectVersion(),
     uptime:  serverStartTime ? Date.now() - serverStartTime : null,
     tps:     lastTps,
   }));
