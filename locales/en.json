@@ -141,7 +141,7 @@
  "ui.no_operators": "<tr class=\"empty\"><td colspan=\"3\">No operators</td></tr>",
  "ui.failed_to_load": "<tr class=\"empty\"><td colspan=\"3\">Failed to load</td></tr>",
  "ui.loading_2": "<tr class=\"empty\"><td colspan=\"4\">Loading...</td></tr>",
- "ui.no_banned_players": "<tr class=\"empty\"><td colspan=\"4\">No banned players</td></tr>",
+ "ui.no_banned_players": "<tr class=\"empty\"><td colspan=\"5\">No banned players</td></tr>",
  "ui.unban": "\">Unban</button></td>",
  "ui.failed_to_load_2": "<tr class=\"empty\"><td colspan=\"4\">Failed to load</td></tr>",
  "ui.whitelist_is_empty": "<tr class=\"empty\"><td colspan=\"3\">Whitelist is empty</td></tr>",
@@ -877,5 +877,16 @@
  "ui.sch_next": "next: {v0}",
  "ui.sch_done": "Done",
  "ui.sch_pick_day": "Pick at least one day",
- "ui.sch_pick_date": "Choose a date and time"
+ "ui.sch_pick_date": "Choose a date and time",
+ "ui.flt_all": "All players",
+ "ui.flt_online": "Online",
+ "ui.flt_offline": "Offline",
+ "ui.flt_banned": "Banned",
+ "ui.sort_recent": "Sort: last seen",
+ "ui.sort_joins": "Sort: most joins",
+ "ui.sort_first": "Sort: newest players",
+ "ui.sort_name": "Sort: name",
+ "ui.search_bans": "Search name, reason or moderator",
+ "ui.ban_by": "Banned by",
+ "ui.ban_by_console": "Console"
 }

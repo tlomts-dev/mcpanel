@@ -320,6 +320,7 @@ select.sel:focus{border-color:var(--accent2);}
 .sch-when{margin-top:6px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);}
 .sch-lbl{font-size:12px;color:var(--muted);align-self:center;min-width:70px;}
 .sch-f{margin-top:8px;}
+.flt-count{font-size:12px;color:var(--muted);align-self:center;}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;}
 .quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font),sans-serif;transition:.15s;text-align:center;}
 .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -427,6 +428,12 @@ select.sel:focus{border-color:var(--accent2);}
   .page{padding:12px;}
   .card{padding:14px;}
   .log-area{height:320px;}
+  .hm{display:none;}
+  .btn,.btn-sm,.act-btn,.kebab-btn,.quick-btn,select.inp,input.inp,.chip{min-height:38px!important;}
+  .btn,.act-btn,.btn-sm{display:inline-flex;align-items:center;justify-content:center;}
+  #search-clear{min-width:38px;min-height:38px!important;}
+  .mc-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .mc-table th,.mc-table td{padding:8px 6px;}
 }
 .hist-h{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px;}
 .hist-h b{font-family:'IBM Plex Mono',monospace;color:var(--num-color);font-weight:600;}
@@ -745,9 +752,16 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           </div>
           <div class="filter-bar">
             <input class="inp" id="allplayers-filter" placeholder="@@ui.search_by_name@@" style="max-width:220px;" oninput="renderAllPlayersTable()">
+            <select class="inp" id="allplayers-status" onchange="renderAllPlayersTable()" style="max-width:150px;">
+              <option value="">@@ui.flt_all@@</option><option value="online">@@ui.flt_online@@</option><option value="offline">@@ui.flt_offline@@</option><option value="banned">@@ui.flt_banned@@</option>
+            </select>
+            <select class="inp" id="allplayers-sort" onchange="renderAllPlayersTable()" style="max-width:190px;">
+              <option value="recent">@@ui.sort_recent@@</option><option value="joins">@@ui.sort_joins@@</option><option value="first">@@ui.sort_first@@</option><option value="name">@@ui.sort_name@@</option>
+            </select>
+            <span class="flt-count" id="allplayers-count"></span>
           </div>
           <table class="mc-table">
-            <thead><tr><th>@@ui.player_2@@</th><th>@@ui.status@@</th><th>@@ui.first_seen_2@@</th><th>@@ui.last_seen_2@@</th><th>@@ui.joins_2@@</th></tr></thead>
+            <thead><tr><th>@@ui.player_2@@</th><th>@@ui.status@@</th><th class="hm">@@ui.first_seen_2@@</th><th>@@ui.last_seen_2@@</th><th>@@ui.joins_2@@</th></tr></thead>
             <tbody id="allplayers-body"><tr class="empty"><td colspan="5">@@ui.loading_3@@</td></tr></tbody>
           </table>
         </div>
@@ -807,9 +821,13 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
             <button class="btn btn-danger" onclick="banAction()">@@ui.ban_3@@</button>
             <button class="btn btn-ghost" onclick="unbanAction()">@@ui.unban_2@@</button>
           </div>
+          <div class="filter-bar">
+            <input class="inp" id="bans-filter" placeholder="@@ui.search_bans@@" style="max-width:260px;" oninput="renderBans()">
+            <span class="flt-count" id="bans-count"></span>
+          </div>
           <table class="mc-table">
-            <thead><tr><th>@@ui.player_2@@</th><th>@@ui.reason@@</th><th>@@ui.date@@</th><th></th></tr></thead>
-            <tbody id="bans-body"><tr class="empty"><td colspan="4">@@ui.loading_3@@</td></tr></tbody>
+            <thead><tr><th>@@ui.player_2@@</th><th>@@ui.reason@@</th><th>@@ui.ban_by@@</th><th class="hm">@@ui.date@@</th><th></th></tr></thead>
+            <tbody id="bans-body"><tr class="empty"><td colspan="5">@@ui.loading_3@@</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1339,7 +1357,13 @@ function banAction(){var name=document.getElementById('ban-name').value.trim(),r
 function unbanAction(){var name=document.getElementById('ban-name').value.trim();if(!name||!PLAYER_RE.test(name)){toast(T('ui.invalid_name'),'err');return;}qp('unban',name);}
 async function unbanFromList(name){await qp('unban',name);setTimeout(loadBans,600);}
 async function loadOps(){var tb=document.getElementById('ops-body');tb.innerHTML=T('ui.loading');try{var d=await fetch('/api/ops').then(function(r){return r.json();});document.getElementById('total-ops').textContent=d.ops.length||'0';if(!d.ops.length){tb.innerHTML=T('ui.no_operators');return;}tb.innerHTML='';d.ops.forEach(function(o){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(o.name||'—')+'</span></td><td><span class="badge badge-op">Level '+(o.level||4)+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(o.uuid||'—')+'</td>';tb.appendChild(tr);});}catch(e){tb.innerHTML=T('ui.failed_to_load');}}
-async function loadBans(){var tb=document.getElementById('bans-body');tb.innerHTML=T('ui.loading_2');try{var d=await fetch('/api/bans').then(function(r){return r.json();});document.getElementById('total-banned').textContent=d.bans.length||'0';if(!d.bans.length){tb.innerHTML=T('ui.no_banned_players');return;}tb.innerHTML='';d.bans.forEach(function(b){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(b.name||'—')+'</span></td><td style="font-size:12px;color:var(--danger)">'+esc(b.reason||'—')+(b.expires?' ⏳ '+esc(fmtDate(b.expires)):'')+'</td><td style="font-size:11px;color:var(--muted)">'+esc(b.created||'—')+'</td><td><button class="act-btn act-ok" data-unban="'+esc(b.name||'')+T('ui.unban');tb.appendChild(tr);});}catch(e){tb.innerHTML=T('ui.failed_to_load_2');}}
+var bansData=[];
+async function loadBans(){var tb=document.getElementById('bans-body');tb.innerHTML=T('ui.loading_2');try{var d=await fetch('/api/bans').then(function(r){return r.json();});bansData=d.bans||[];document.getElementById('total-banned').textContent=bansData.length||'0';renderBans();}catch(e){tb.innerHTML=T('ui.failed_to_load_2');}}
+function renderBans(){var tb=document.getElementById('bans-body');if(!tb)return;var q=((document.getElementById('bans-filter')||{}).value||'').toLowerCase();
+  var list=bansData.filter(function(b){return !q||[b.name,b.reason,b.by].join(' ').toLowerCase().indexOf(q)>-1;});
+  var cnt=document.getElementById('bans-count');if(cnt)cnt.textContent=list.length+' / '+bansData.length;
+  if(!list.length){tb.innerHTML=bansData.length?'<tr class="empty"><td colspan="5">'+esc(T('ui.no_results'))+'</td></tr>':T('ui.no_banned_players');return;}
+  tb.innerHTML='';list.forEach(function(b){var tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+esc(b.name||'—')+'</span></td><td style="font-size:12px;color:var(--danger)">'+esc(b.reason||'—')+(b.expires?' ⏳ '+esc(fmtDate(b.expires)):'')+'</td><td style="font-size:12px;">'+esc(b.by||T('ui.ban_by_console'))+'</td><td class="hm" style="font-size:11px;color:var(--muted)">'+esc(b.created||'—')+'</td><td><button class="act-btn act-ok" data-unban="'+esc(b.name||'')+T('ui.unban');tb.appendChild(tr);});}
 async function loadWhitelist(){var tb=document.getElementById('wl-body');tb.innerHTML=T('ui.loading');try{var d=await fetch('/api/whitelist').then(function(r){return r.json();});if(!d.whitelist.length){tb.innerHTML=T('ui.whitelist_is_empty');return;}tb.innerHTML='';d.whitelist.forEach(function(w){var sn=esc(w.name||'—'),tr=document.createElement('tr');tr.innerHTML='<td><span class="pname">'+sn+'</span></td><td style="font-family:monospace;font-size:10px;color:var(--muted);direction:ltr;">'+esc(w.uuid||'—')+'</td><td><button class="act-btn act-danger" data-wlrm="'+sn+T('ui.remove');tb.appendChild(tr);});}catch(e){tb.innerHTML=T('ui.failed_to_load');}}
 
 // ════════════ كل اللاعبين (سجل دائم) ════════════
@@ -1354,14 +1378,17 @@ async function loadAllPlayers(){
 function renderAllPlayersTable(){
   var tb=document.getElementById('allplayers-body');if(!tb)return;
   var qEl=document.getElementById('allplayers-filter');var q=(qEl?qEl.value:'').toLowerCase();
-  var list=allPlayersData.filter(function(p){return !q||p.name.toLowerCase().indexOf(q)>-1;});
-  if(!list.length){tb.innerHTML=T('ui.no_players_yet');return;}
+  var st=(document.getElementById('allplayers-status')||{}).value||'',so=(document.getElementById('allplayers-sort')||{}).value||'recent';
+  var list=allPlayersData.filter(function(p){return (!q||p.name.toLowerCase().indexOf(q)>-1)&&(!st||(st==='online'?p.online:st==='offline'?!p.online:p.banned));});
+  list.sort(so==='joins'?function(a,b){return (b.joinCount||0)-(a.joinCount||0);}:so==='first'?function(a,b){return (b.firstSeen||0)-(a.firstSeen||0);}:so==='name'?function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;}:function(a,b){return (b.online-a.online)||((b.lastSeen||0)-(a.lastSeen||0));});
+  var cnt=document.getElementById('allplayers-count');if(cnt)cnt.textContent=list.length+' / '+allPlayersData.length;
+  if(!list.length){tb.innerHTML=allPlayersData.length?'<tr class="empty"><td colspan="5">'+esc(T('ui.no_results'))+'</td></tr>':T('ui.no_players_yet');return;}
   tb.innerHTML='';
   list.forEach(function(p){
     var tr=document.createElement('tr');tr.className='player-row';tr.setAttribute('data-popen',p.name);
     tr.innerHTML='<td><span class="pname">'+esc(p.name)+'</span></td>'
-      +'<td>'+(p.online?T('ui.online'):T('ui.offline'))+'</td>'
-      +'<td style="font-size:11px;color:var(--muted);">'+fmtDate(p.firstSeen)+'</td>'
+      +'<td>'+(p.online?T('ui.online'):T('ui.offline'))+(p.banned?' <span class="badge badge-off">'+esc(T('ui.flt_banned'))+'</span>':'')+'</td>'
+      +'<td class="hm" style="font-size:11px;color:var(--muted);">'+fmtDate(p.firstSeen)+'</td>'
       +'<td style="font-size:11px;color:var(--muted);">'+fmtDate(p.lastSeen)+'</td>'
       +'<td style="font-size:11px;">'+(p.joinCount||0)+'</td>';
     tb.appendChild(tr);

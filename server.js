@@ -949,6 +949,8 @@ app.post('/api/command', requireAuth, (req, res) => {
   if (!cmd)         return res.status(400).json({ error: t('srv.invalid_command') });
   if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
   sendCommand(cmd);
+  const bm = /^\/?ban\s+(\w{1,16})(\s|$)/i.exec(cmd);
+  if (bm) noteBan(bm[1], req.user);
   res.json({ success: true });
 });
 
@@ -989,9 +991,30 @@ app.post('/api/player/tempban', (req, res) => {
   if (raw && !reason) return res.status(400).json({ error: t('srv.invalid_reason') });
   if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
   sendCommand('ban ' + p + (reason ? ' ' + reason : ''));
+  noteBan(p, req.user);
   minutes > 0 ? tempBans.add(p, minutes) : tempBans.remove(p);
   res.json({ success: true });
 });
+
+// ── Who banned whom (Minecraft itself only records "Server" for console bans) ─────────────
+const BANMETA_FILE = path.join(SERVER_DIR, '.panel-banmeta.json');
+let banMeta = {};
+try { banMeta = JSON.parse(fs.readFileSync(BANMETA_FILE, 'utf8')) || {}; } catch { banMeta = {}; }
+function noteBan(name, user) {
+  if (!name || !user) return;
+  banMeta[String(name).toLowerCase()] = { by: user, at: Date.now() };
+  const keys = Object.keys(banMeta);
+  if (keys.length > 2000) for (const k of keys.sort((a, b) => banMeta[a].at - banMeta[b].at).slice(0, keys.length - 2000)) delete banMeta[k];
+  try { fs.writeFileSync(BANMETA_FILE, JSON.stringify(banMeta)); } catch {}
+}
+// "2026-11-13 19:16:00 +0300" (banned-players.json) -> ms
+const banCreatedMs = c => { const m = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d) ([+-]\d\d)(\d\d)$/.exec(String(c || '')); return m ? Date.parse(`${m[1]}T${m[2]}${m[3]}:${m[4]}`) : NaN; };
+// The panel user is only trusted when the ban was made right then; an older ban with the same name was made by someone else.
+function banBy(b) {
+  const m = banMeta[String(b.name || '').toLowerCase()], ms = banCreatedMs(b.created);
+  if (m && (!Number.isFinite(ms) || Math.abs(ms - m.at) < 5 * 60000)) return m.by;
+  return b.source && b.source !== 'Server' ? b.source : null;
+}
 
 // ── Player actions ────────────────────────────────────────────────────────────
 const PLAYER_ACTIONS = {
@@ -1013,7 +1036,8 @@ Object.entries(PLAYER_ACTIONS).forEach(([action, fn]) => {
     if (!p)           return res.status(400).json({ error: t('srv.invalid_player_name') });
     if (!isRunning()) return res.status(409).json({ error: t('srv.server_is_stopped') });
     sendCommand(fn(p));
-    if (action === 'ban' || action === 'pardon') tempBans.remove(p);
+    if (action === 'ban') noteBan(p, req.user);
+    if (action === 'ban' || action === 'unban') tempBans.remove(p);
     res.json({ success: true });
   });
 });
@@ -1034,7 +1058,7 @@ app.get('/api/ops',       requireAuth, async (_req, res) => {
 app.get('/api/bans',      requireAuth, async (_req, res) => {
   const bans = await readJsonFile('banned-players.json');
   const timed = tempBans.list();
-  res.json({ bans: bans.map(b => ({ name: b.name, reason: b.reason, created: b.created, expires: timed[b.name] || null })) });
+  res.json({ bans: bans.map(b => ({ name: b.name, reason: b.reason, created: b.created, expires: timed[b.name] || null, by: banBy(b) })) });
 });
 app.get('/api/whitelist', requireAuth, async (_req, res) => {
   const list = await readJsonFile('whitelist.json');
@@ -1042,9 +1066,10 @@ app.get('/api/whitelist', requireAuth, async (_req, res) => {
 });
 
 // ── قاعدة بيانات اللاعبين (كل من دخل السيرفر تاريخياً) ────────────────────────
-app.get('/api/players/all', requireAuth, (_req, res) => {
+app.get('/api/players/all', requireAuth, async (_req, res) => {
+  const banned = new Set((await readJsonFile('banned-players.json')).map(b => String(b.name || '').toLowerCase()));
   const list = Object.values(playersDB).map(p => ({
-    name: p.name, online: !!p.online,
+    name: p.name, online: !!p.online, banned: banned.has(String(p.name).toLowerCase()),
     firstSeen: p.firstSeen, lastSeen: p.lastSeen, lastLeft: p.lastLeft,
     joinCount: p.joinCount || 0,
     deathCount: (p.deaths || []).length, teleportCount: (p.teleports || []).length,

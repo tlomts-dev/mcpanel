@@ -141,7 +141,7 @@
  "ui.no_operators": "<tr class=\"empty\"><td colspan=\"3\">لا يوجد مشرفون</td></tr>",
  "ui.failed_to_load": "<tr class=\"empty\"><td colspan=\"3\">فشل التحميل</td></tr>",
  "ui.loading_2": "<tr class=\"empty\"><td colspan=\"4\">جارٍ التحميل...</td></tr>",
- "ui.no_banned_players": "<tr class=\"empty\"><td colspan=\"4\">لا يوجد محظورون</td></tr>",
+ "ui.no_banned_players": "<tr class=\"empty\"><td colspan=\"5\">لا يوجد محظورون</td></tr>",
  "ui.unban": "\">فك الحظر</button></td>",
  "ui.failed_to_load_2": "<tr class=\"empty\"><td colspan=\"4\">فشل التحميل</td></tr>",
  "ui.whitelist_is_empty": "<tr class=\"empty\"><td colspan=\"3\">القائمة البيضاء فارغة</td></tr>",
@@ -877,5 +877,16 @@
  "ui.sch_next": "التالي: {v0}",
  "ui.sch_done": "منتهية",
  "ui.sch_pick_day": "اختر يوماً واحداً على الأقل",
- "ui.sch_pick_date": "اختر التاريخ والوقت"
+ "ui.sch_pick_date": "اختر التاريخ والوقت",
+ "ui.flt_all": "كل اللاعبين",
+ "ui.flt_online": "متصل",
+ "ui.flt_offline": "غير متصل",
+ "ui.flt_banned": "محظور",
+ "ui.sort_recent": "الترتيب: آخر ظهور",
+ "ui.sort_joins": "الترتيب: الأكثر دخولاً",
+ "ui.sort_first": "الترتيب: الأحدث انضماماً",
+ "ui.sort_name": "الترتيب: الاسم",
+ "ui.search_bans": "ابحث بالاسم أو السبب أو المشرف",
+ "ui.ban_by": "حظره",
+ "ui.ban_by_console": "الكونسول"
 }
