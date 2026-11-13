@@ -1402,11 +1402,12 @@ app.post('/api/plugins/delete', async (req, res) => {
   catch { res.status(404).json({ error: t('srv.file_not_found') }); }
 });
 app.get('/api/plugins/search', async (req, res) => {
-  try { res.json({ results: await downloads.searchPlugins(req.query.q, mcVersionOnly()) }); }
+  try { res.json({ results: await (req.query.source === 'hangar' ? downloads.searchHangar : downloads.searchPlugins)(req.query.q, mcVersionOnly()) }); }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
 app.post('/api/plugins/install', async (req, res) => {
-  try { res.json({ success: true, ...(await downloads.installPlugin((req.body || {}).id, mcVersionOnly(), PLUGINS_DIR)) }); }
+  const b = req.body || {};
+  try { res.json({ success: true, ...(await (b.source === 'hangar' ? downloads.installHangar : downloads.installPlugin)(b.id, mcVersionOnly(), PLUGINS_DIR)) }); }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
 // ── Server jar: current version/build, update check, download a chosen build, one-click update ───────────

@@ -888,5 +888,6 @@
  "ui.sort_name": "Sort: name",
  "ui.search_bans": "Search name, reason or moderator",
  "ui.ban_by": "Banned by",
- "ui.ban_by_console": "Console"
+ "ui.ban_by_console": "Console",
+ "ui.search_plugins": "Search plugins..."
 }

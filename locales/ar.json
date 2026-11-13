@@ -888,5 +888,6 @@
  "ui.sort_name": "الترتيب: الاسم",
  "ui.search_bans": "ابحث بالاسم أو السبب أو المشرف",
  "ui.ban_by": "حظره",
- "ui.ban_by_console": "الكونسول"
+ "ui.ban_by_console": "الكونسول",
+ "ui.search_plugins": "ابحث عن إضافة..."
 }

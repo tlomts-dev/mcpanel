@@ -261,3 +261,34 @@ test('scheduler: friendly schedules compile to cron, one-time tasks run once', a
   assert.strictEqual(await sch.runNow(r2.task.id), 'ok');
   assert.deepStrictEqual(ran, ['save-all']);
 });
+
+test('downloads: Hangar search and install (release first, fixed host, checksum)', async () => {
+  const { createDownloads } = require('../lib/downloads');
+  const crypto = require('crypto');
+  const jar = Buffer.from('PK-hangar-jar');
+  const sha256 = crypto.createHash('sha256').update(jar).digest('hex');
+  let downloadUrl = 'https://hangarcdn.papermc.io/plugins/o/P/versions/1/PAPER/P.jar', hash = sha256, relEmpty = false;
+  const urls = [];
+  const fake = async url => {
+    urls.push(url);
+    if (url.includes('/projects?')) return Response.json({ result: [{ name: 'P', namespace: { owner: 'o', slug: 'P' }, description: 'd', stats: { downloads: 9 } }, { name: 'bad', namespace: { slug: 'a/b' } }] });
+    if (url.includes('/versions?')) {
+      if (url.includes('channel=Release') && relEmpty) return Response.json({ result: [] });
+      return Response.json({ result: [{ name: '1.0', downloads: { PAPER: { fileInfo: { name: 'P-1.0.jar', sha256Hash: hash }, downloadUrl } } }] });
+    }
+    return new Response(jar);
+  };
+  const d = createDownloads({ fetchImpl: fake }), dir = tmp();
+  const hits = await d.searchHangar('p', '1.21.8');
+  assert.deepStrictEqual(hits.map(h => h.slug), ['P']);          // names that are not a plain slug are dropped
+  assert.ok(urls[0].includes('version=1.21.8'));
+  assert.strictEqual((await d.installHangar('P', '1.21.8', dir)).file, 'P-1.0.jar');
+  assert.ok(urls.some(u => u.includes('channel=Release')) && fs.existsSync(path.join(dir, 'P-1.0.jar')));
+  relEmpty = true;                                                // no release: falls back to any channel
+  assert.strictEqual((await d.installHangar('P', '1.21.8', dir)).version, '1.0');
+  hash = 'deadbeef';
+  await assert.rejects(d.installHangar('P', '1.21.8', dir), /checksum/);
+  hash = sha256; downloadUrl = 'https://evil.example/P.jar';
+  await assert.rejects(d.installHangar('P', '1.21.8', dir), /blocked host/);
+  await assert.rejects(d.installHangar('../x', '1.21.8', dir), /bad project/);
+});
