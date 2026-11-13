@@ -178,7 +178,7 @@ try { clkTck = parseInt(execSync('getconf CLK_TCK').toString().trim(), 10) || 10
 
 // أوامر تستخدمها اللوحة داخليًا (قياس TPS وتحديث قائمة اللاعبين)، نخفيها من الكونسول
 // لأن ردّها مو مفيد للمستخدم هناك، والقيمة الفعلية توصل عن طريق بث WebSocket مخصص
-const HIDDEN_COMMANDS = new Set(['tps', 'list']);
+const HIDDEN_COMMANDS = new Set(['tps', 'list', 'version']);
 
 const LOG_MAX   = 500;
 const logBuffer = [];
@@ -632,18 +632,34 @@ function extractPlayerName(segment) {
 // The Minecraft version. Normally learned from the startup log line; when the panel was restarted while the
 // server kept running that line was never seen, so fall back to the log file, Paper's version_history.json,
 // and finally the version number in the jar's file name.
+// Reads the start and the end of a log file. The startup lines sit at the top of the current run's log, which grows
+// past any "last N KB" window on a server that has been up for days, so both ends are searched.
+function logHeadTail(file) {
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const size = fs.fstatSync(fd).size, n = Math.min(size, 512000);
+      const head = Buffer.alloc(n); fs.readSync(fd, head, 0, n, 0);
+      if (size <= n) return head.toString('utf8');
+      const tail = Buffer.alloc(n); fs.readSync(fd, tail, 0, n, size - n);
+      return head.toString('utf8') + '\n' + tail.toString('utf8');
+    } finally { fs.closeSync(fd); }
+  } catch { return ''; }
+}
+const PAPER_LINE_RE = /running Paper version\s+(\d+(?:\.\d+)*)-(\d+)-/gi;
+const LOG_FILES = () => [MC_LOG_FILE, path.join(SERVER_DIR, 'logs', 'latest.log')];
+
 function detectVersion() {
   if (serverVersion) return serverVersion;
   const found = v => { serverVersion = v; return v; };
-  try {
-    const fd = fs.openSync(MC_LOG_FILE, 'r');
-    try {
-      const size = fs.fstatSync(fd).size, len = Math.min(size, 400000), buf = Buffer.alloc(len);
-      fs.readSync(fd, buf, 0, len, size - len);
-      const all = [...buf.toString('utf8').matchAll(/Starting minecraft server version (\S+)/gi)];
-      if (all.length) return found(all[all.length - 1][1]);
-    } finally { fs.closeSync(fd); }
-  } catch {}
+  for (const f of LOG_FILES()) {
+    const txt = logHeadTail(f);
+    const a = [...txt.matchAll(/Starting minecraft server version (\S+)/gi)];
+    if (a.length) return found(a[a.length - 1][1]);
+    const b = [...txt.matchAll(PAPER_LINE_RE)];
+    if (b.length) return found(b[b.length - 1][1]);
+  }
+  if (jarMeta.mc) return found(jarMeta.mc);
   try {
     const h = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'version_history.json'), 'utf8'));
     const m = /MC:\s*(\d+\.\d+(?:\.\d+)?)/.exec(String(h.currentVersion || ''));
@@ -656,6 +672,8 @@ function detectVersion() {
 function parseLogLine(line) {
   const bm = line.match(/running Paper version\s+\d+(?:\.\d+)*-(\d+)-/i);
   if (bm) { serverBuild = Number(bm[1]); updateCache = { at: 0, data: null }; }
+  const pm = !serverVersion && line.match(/running Paper version\s+(\d+(?:\.\d+)*)-\d+-/i);
+  if (pm) serverVersion = pm[1];
   const vm = line.match(/Starting minecraft server version (.+)/i);
   if (vm) { serverVersion = vm[1].trim(); broadcast({ type: 'info', version: serverVersion }); }
 
@@ -837,6 +855,7 @@ function startMC() {
 
   serverVersion   = null;
   serverBuild     = null;
+  askedVersion    = false;
   serverStartTime = Date.now();
   lastTps         = null;
   mcPid           = null;
@@ -1627,24 +1646,55 @@ function currentBuild() {
   } catch {}
   if (serverBuild) return serverBuild;
   // Newer Paper builds do not write version_history.json and the jar may have a fixed name (paper.jar):
-  // the startup log is then the only place that says which build is running.
-  for (const f of [MC_LOG_FILE, path.join(SERVER_DIR, 'logs', 'latest.log')]) {
-    try {
-      const fd = fs.openSync(f, 'r');
-      try {
-        const size = fs.fstatSync(fd).size, len = Math.min(size, 400000), buf = Buffer.alloc(len);
-        fs.readSync(fd, buf, 0, len, size - len);
-        const all = [...buf.toString('utf8').matchAll(/running Paper version\s+\d+(?:\.\d+)*-(\d+)-/gi)];
-        if (all.length) { serverBuild = Number(all[all.length - 1][1]); return serverBuild; }
-      } finally { fs.closeSync(fd); }
-    } catch {}
+  // the startup log says which build is running, and failing that the jar's own hash does (see jarMeta).
+  for (const f of LOG_FILES()) {
+    const b = [...logHeadTail(f).matchAll(PAPER_LINE_RE)];
+    if (b.length) { serverBuild = Number(b[b.length - 1][2]); return serverBuild; }
   }
+  if (jarMeta.build) return jarMeta.build;
   const jm = /-(\d+)\.jar$/.exec(serverJar() || '');
   return jm ? Number(jm[1]) : null;
+}
+
+// What the server jar itself says: version.json inside it gives the Minecraft version, and its sha256 matched
+// against the hashes PaperMC publishes gives the exact build. Cached until the jar changes (name, size, date).
+let jarMeta = { key: '', mc: null, build: null, sha: null, checked: 0 };
+async function refreshJarMeta() {
+  const file = path.join(SERVER_DIR, serverJar());
+  let st; try { st = await fsp.stat(file); } catch { jarMeta = { key: '', mc: null, build: null, sha: null, checked: 0 }; return jarMeta; }
+  const key = serverJar() + '|' + st.size + '|' + st.mtimeMs;
+  if (jarMeta.key !== key) {
+    jarMeta = { key, mc: null, build: null, sha: null, checked: 0 };
+    try {
+      const zip = await unzipper.Open.file(file);
+      const vj = zip.files.find(e => e.path === 'version.json');
+      if (vj) { const id = String(JSON.parse((await vj.buffer()).toString('utf8')).id || ''); if (/^\d+(\.\d+){1,3}$/.test(id)) jarMeta.mc = id; }
+    } catch {}
+    try {
+      jarMeta.sha = await new Promise((resolve, reject) => {
+        const h = crypto.createHash('sha256');
+        fs.createReadStream(file).on('data', d => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
+      });
+    } catch {}
+  }
+  // ask PaperMC at most every 10 minutes while the build is still unknown
+  if (!jarMeta.build && jarMeta.sha && jarMeta.mc && Date.now() - jarMeta.checked > 10 * 60000) {
+    jarMeta.checked = Date.now();
+    try { jarMeta.build = await downloads.paperBuildBySha(jarMeta.mc, jarMeta.sha); } catch {}
+  }
+  return jarMeta;
+}
+// Last resort while the server runs: Paper's own "version" command prints the build line, which parseLogLine reads.
+let askedVersion = false;
+function askServerVersion() {
+  if (askedVersion || !isRunning() || (serverBuild && serverVersion)) return;
+  askedVersion = true;
+  sendCommand('version');
 }
 let updateCache = { at: 0, data: null };
 async function checkUpdate(force) {
   if (!force && updateCache.data && Date.now() - updateCache.at < 10 * 60000) return updateCache.data;
+  await refreshJarMeta(); askServerVersion();
   const mc = mcVersionOnly(), build = currentBuild();
   const data = { mc, build, jar: serverJar(), latestBuild: null, newerVersion: null, updateAvailable: false };
   const versions = await downloads.paperVersions();
@@ -1659,6 +1709,7 @@ async function checkUpdate(force) {
   return data;
 }
 app.get('/api/jars/paper', async (_req, res) => {
+  await refreshJarMeta(); askServerVersion();
   try { res.json({ versions: await downloads.paperVersions(), current: serverJar(), running: runningJarName(), mc: mcVersionOnly(), build: currentBuild() }); }
   catch (e) { res.status(502).json({ error: dlError(e) }); }
 });
@@ -2143,6 +2194,7 @@ app.use((err, req, res, next) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Panel] http://localhost:${PORT}`);
   console.log(`[Panel] MC dir: ${SERVER_DIR} | Jar: ${serverJar()}`);
+  refreshJarMeta().catch(() => {});   // version and build from the jar itself, so they show right away
   console.log(`[Panel] tmux session: ${TMUX_SESSION} | Log: ${MC_LOG_FILE}`);
 });
 
