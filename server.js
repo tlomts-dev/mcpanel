@@ -2201,8 +2201,12 @@ function restartPanel() {
   broadcast({ type: 'log', data: t('srv.panel_selfupdate_restarting') + '\n' });
   setTimeout(() => {
     if (sup === 'none') {
-      // a small helper waits until this process has let go of the port, then starts the panel again
-      const helper = `setTimeout(()=>{require('child_process').spawn(${JSON.stringify(process.execPath)},${JSON.stringify([...process.execArgv, ...process.argv.slice(1)])},{cwd:${JSON.stringify(process.cwd())},detached:true,stdio:'ignore'}).unref()},2500)`;
+      // A small helper waits, then starts the panel again only if nothing took the port in the meantime: when the
+      // panel runs inside a shell loop (`while true; do node server.js; done` in tmux) the loop restarts it and the
+      // helper must not start a second copy.
+      const cmd = JSON.stringify(process.execPath), args = JSON.stringify([...process.execArgv, ...process.argv.slice(1)]), cwd = JSON.stringify(process.cwd());
+      const helper = `setTimeout(()=>{const s=require('net').createServer();s.once('error',()=>process.exit(0));` +
+        `s.listen(${PORT},()=>s.close(()=>{require('child_process').spawn(${cmd},${args},{cwd:${cwd},detached:true,stdio:'ignore'}).unref();}));},8000)`;
       spawn(process.execPath, ['-e', helper], { cwd: process.cwd(), env: process.env, detached: true, stdio: 'ignore' }).unref();
       process.exit(0);
     }
