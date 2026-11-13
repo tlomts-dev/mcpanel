@@ -890,5 +890,7 @@
  "ui.ban_by": "Banned by",
  "ui.ban_by_console": "Console",
  "ui.search_plugins": "Search plugins...",
- "ui.jar_running_other": "running now: {v0}, the new jar applies on the next start"
+ "ui.jar_running_other": "running now: {v0}, the new jar applies on the next start",
+ "srv.server_was_stopped": "Server was stopped (stopped on purpose, from the panel or with the stop command)",
+ "ui.al_any_stop": "Server stopped on purpose (stop button or command)"
 }

@@ -292,3 +292,23 @@ test('downloads: Hangar search and install (release first, fixed host, checksum)
   await assert.rejects(d.installHangar('P', '1.21.8', dir), /blocked host/);
   await assert.rejects(d.installHangar('../x', '1.21.8', dir), /bad project/);
 });
+
+test('monitor: "stopped on purpose" alert is its own option, off by default', async () => {
+  const dir = tmp(), hits = [];
+  const srv = http.createServer((req, res) => { let b = ''; req.on('data', d => b += d); req.on('end', () => { hits.push(JSON.parse(b)); res.end('ok'); }); });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  fs.writeFileSync(path.join(dir, '.panel-alerts.json'), JSON.stringify({ discord: `http://127.0.0.1:${srv.address().port}/hook` }));
+  const m = createMonitor({ dir, serverName: 'T', log: () => {} });
+  assert.strictEqual(m.getConfig().stopped, false);
+  assert.strictEqual(m.getConfig().crash, true);
+  m.event('stopped', 'Server was stopped');
+  await new Promise(r => setTimeout(r, 200));
+  assert.strictEqual(hits.length, 0);                          // off: nothing is sent
+  assert.ok(m.setConfig({ stopped: true }).ok !== false);
+  m.event('stopped', 'Server was stopped');
+  await new Promise(r => setTimeout(r, 300));
+  assert.strictEqual(hits.length, 1);
+  assert.match(hits[0].content, /stopped/i);
+  assert.strictEqual(m.getConfig().stopped, true);
+  srv.close();
+});

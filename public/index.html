@@ -1053,6 +1053,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <div class="field"><input class="inp" id="al-discord" dir="ltr" placeholder="@@ui.discord_webhook_url@@" autocomplete="off"></div>
           <div class="inp-row"><input class="inp" id="al-tgtoken" dir="ltr" placeholder="@@ui.telegram_bot_token@@" autocomplete="off"><input class="inp" id="al-tgchat" dir="ltr" placeholder="@@ui.telegram_chat_id@@" autocomplete="off"></div>
           <div class="al-row"><label><input type="checkbox" id="al-crash"> @@ui.server_stopped_unexpectedly@@</label></div>
+          <div class="al-row"><label><input type="checkbox" id="al-stopped"> @@ui.al_any_stop@@</label></div>
           <div class="al-row"><label><input type="checkbox" id="al-started"> @@ui.server_started@@</label></div>
           <div class="al-row"><label><input type="checkbox" id="al-tps-on"> @@ui.low_tps@@</label> @@ui.below@@ <input class="inp" id="al-tps-below" type="number" min="1" max="20"> @@ui.for_minutes@@ <input class="inp" id="al-tps-min" type="number" min="1" max="60"></div>
           <div class="al-row"><label><input type="checkbox" id="al-ram-on"> @@ui.high_memory_use@@</label> @@ui.above@@ <input class="inp" id="al-ram-pct" type="number" min="50" max="100"> @@ui.for_minutes@@ <input class="inp" id="al-ram-min" type="number" min="1" max="60"></div>
@@ -2161,12 +2162,12 @@ function drawHistory(){
 }
 async function loadAlerts(){try{var c=await fetch('/api/alerts').then(function(r){return r.json();});
   document.getElementById('al-discord').value=c.discord||'';document.getElementById('al-tgtoken').value=c.telegramToken||'';document.getElementById('al-tgchat').value=c.telegramChat||'';
-  document.getElementById('al-crash').checked=!!c.crash;document.getElementById('al-started').checked=!!c.started;
+  document.getElementById('al-crash').checked=!!c.crash;document.getElementById('al-started').checked=!!c.started;document.getElementById('al-stopped').checked=!!c.stopped;
   document.getElementById('al-tps-on').checked=!!c.lowTps.on;document.getElementById('al-tps-below').value=c.lowTps.below;document.getElementById('al-tps-min').value=c.lowTps.forMin;
   document.getElementById('al-ram-on').checked=!!c.highRam.on;document.getElementById('al-ram-pct').value=c.highRam.abovePct;document.getElementById('al-ram-min').value=c.highRam.forMin;
   document.getElementById('al-disk-on').checked=!!c.lowDisk.on;document.getElementById('al-disk-gb').value=c.lowDisk.belowGB;document.getElementById('al-cool').value=c.cooldownMin;}catch(e){}}
 async function saveAlerts(){var g=function(i){return document.getElementById(i);};
-  try{await apiPost('/api/alerts',{discord:g('al-discord').value,telegramToken:g('al-tgtoken').value,telegramChat:g('al-tgchat').value,crash:g('al-crash').checked,started:g('al-started').checked,
+  try{await apiPost('/api/alerts',{discord:g('al-discord').value,telegramToken:g('al-tgtoken').value,telegramChat:g('al-tgchat').value,crash:g('al-crash').checked,started:g('al-started').checked,stopped:g('al-stopped').checked,
     lowTps:{on:g('al-tps-on').checked,below:g('al-tps-below').value,forMin:g('al-tps-min').value},highRam:{on:g('al-ram-on').checked,abovePct:g('al-ram-pct').value,forMin:g('al-ram-min').value},
     lowDisk:{on:g('al-disk-on').checked,belowGB:g('al-disk-gb').value},cooldownMin:g('al-cool').value});toast(T('ui.saved_2'));loadAlerts();}catch(e){toast(e.message,'err');}}
 async function testAlert(){try{await apiPost('/api/alerts/test');toast(T('ui.test_alert_sent'));}catch(e){toast(e.message,'err');}}

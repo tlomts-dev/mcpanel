@@ -752,6 +752,7 @@ function startTmuxMonitor() {
     cpuSample       = null;
     serverReady     = false;
     if (!intentionalStop && !restartPending) monitor.event('crash', t('srv.server_stopped_unexpectedly_restarting_autom'));
+    else if (intentionalStop && !restartPending && !jarUpdateBusy) monitor.event('stopped', t('srv.server_was_stopped'));
 
     // نظام التشغيل التلقائي إذا كان الإيقاف غير متعمد أو أمر ريستارت
     if (restartPending || !intentionalStop) {
