@@ -145,6 +145,7 @@ function requireAuth(req, res, next) {
 let restartPending  = false;
 let intentionalStop = false; // المتغير الجديد لمعرفة هل الإيقاف متعمد من اللوحة أم لا
 let serverVersion   = null;
+let serverBuild     = null;   // Paper build number, from the startup log line "This server is running Paper version 26.2-135-..."
 let serverStartTime = null;
 let lastTps         = null;
 let mcPid           = null;
@@ -629,6 +630,8 @@ function detectVersion() {
 }
 
 function parseLogLine(line) {
+  const bm = line.match(/running Paper version\s+\d+(?:\.\d+)*-(\d+)-/i);
+  if (bm) { serverBuild = Number(bm[1]); updateCache = { at: 0, data: null }; }
   const vm = line.match(/Starting minecraft server version (.+)/i);
   if (vm) { serverVersion = vm[1].trim(); broadcast({ type: 'info', version: serverVersion }); }
 
@@ -797,6 +800,7 @@ function startMC() {
   const args = buildJvmArgs(cfg);
 
   serverVersion   = null;
+  serverBuild     = null;
   serverStartTime = Date.now();
   lastTps         = null;
   mcPid           = null;
@@ -1453,6 +1457,20 @@ function currentBuild() {
     const m = /Paper-(\d+)/i.exec(String(h.currentVersion || ''));
     if (m) return Number(m[1]);
   } catch {}
+  if (serverBuild) return serverBuild;
+  // Newer Paper builds do not write version_history.json and the jar may have a fixed name (paper.jar):
+  // the startup log is then the only place that says which build is running.
+  for (const f of [MC_LOG_FILE, path.join(SERVER_DIR, 'logs', 'latest.log')]) {
+    try {
+      const fd = fs.openSync(f, 'r');
+      try {
+        const size = fs.fstatSync(fd).size, len = Math.min(size, 400000), buf = Buffer.alloc(len);
+        fs.readSync(fd, buf, 0, len, size - len);
+        const all = [...buf.toString('utf8').matchAll(/running Paper version\s+\d+(?:\.\d+)*-(\d+)-/gi)];
+        if (all.length) { serverBuild = Number(all[all.length - 1][1]); return serverBuild; }
+      } finally { fs.closeSync(fd); }
+    } catch {}
+  }
   const jm = /-(\d+)\.jar$/.exec(serverJar() || '');
   return jm ? Number(jm[1]) : null;
 }
@@ -1508,7 +1526,7 @@ async function applyJarUpdate(newFile, { backup, restart }) {
       await fsp.copyFile(src, target);
     }
     broadcast({ type: 'log', data: t('srv.panel_update_done', { v0: newFile }) + '\n' });
-    updateCache = { at: 0, data: null }; serverVersion = null;
+    updateCache = { at: 0, data: null }; serverVersion = null; serverBuild = null;
     if (restart) { intentionalStop = false; startMC(); }
   } catch (e) {
     broadcast({ type: 'log', data: t('srv.panel_update_failed') + e.message + '\n' });
