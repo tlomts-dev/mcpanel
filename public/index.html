@@ -321,6 +321,8 @@ select.sel:focus{border-color:var(--accent2);}
 .sch-lbl{font-size:12px;color:var(--muted);align-self:center;min-width:70px;}
 .sch-f{margin-top:8px;}
 .flt-count{font-size:12px;color:var(--muted);align-self:center;}
+.pl-upd-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+.pl-upd{color:var(--warn);font-size:12px;margin-top:3px;}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;}
 .quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font),sans-serif;transition:.15s;text-align:center;}
 .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -1072,6 +1074,11 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <div class="card">
             <div class="card-header"><div class="card-title">@@ui.installed_plugins@@</div><span id="pl-ver" style="font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span></div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">@@ui.enabling_disabling_and_deleting_need_a_serve@@</div>
+            <div class="pl-upd-bar">
+              <button class="btn btn-ghost" id="pl-upd-check" onclick="checkPluginUpdates(true)">@@ui.pl_check_updates@@</button>
+              <button class="btn btn-primary" id="pl-upd-all" style="display:none;" onclick="updatePlugins(null)">@@ui.pl_update_all@@</button>
+              <span class="flt-count" id="pl-upd-status"></span>
+            </div>
             <div id="pl-list"></div>
           </div>
         </div>
@@ -2084,7 +2091,7 @@ async function tfaDisable(){try{await apiPost('/api/me/2fa/disable',{password:do
 
 
 // ════════════ PLUGINS + SERVER JAR ════════════
-async function loadPlugins(){try{var d=await fetch('/api/plugins').then(function(r){return r.json();});document.getElementById('pl-ver').textContent=d.mcVersion?('MC '+d.mcVersion):'';plInstalled=d.plugins||[];renderPlugins(plInstalled);}catch(e){}}
+async function loadPlugins(){try{var d=await fetch('/api/plugins').then(function(r){return r.json();});document.getElementById('pl-ver').textContent=d.mcVersion?('MC '+d.mcVersion):'';plInstalled=d.plugins||[];renderPlugins(plInstalled);if(plUpdates===null)checkPluginUpdates(false);}catch(e){}}
 var plInstalled=null;
 function plNorm(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 // Installed? Exact first: the project id the server found for each jar (what the panel installed, or Modrinth's
@@ -2100,12 +2107,27 @@ function renderPlugins(list){var box=document.getElementById('pl-list');box.text
   list.forEach(function(p){var row=document.createElement('div');row.className='backup-row';row.style.flexWrap='wrap';row.style.gap='8px';
     var info=document.createElement('div');info.style.flex='1';var n=document.createElement('div');n.className='backup-name';n.textContent=(p.name||p.file)+(p.version?'  '+p.version:'');
     var b=document.createElement('span');b.className='badge '+(p.enabled?'badge-on':'badge-off');b.style.margin='0 6px';b.textContent=p.enabled?T('ui.enabled_2'):T('ui.disabled_2');n.appendChild(b);
-    var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';m.textContent=p.file+' · '+fmtBytes(p.size);info.appendChild(n);info.appendChild(m);row.appendChild(info);
+    var m=document.createElement('div');m.className='backup-meta';m.style.direction='ltr';m.style.textAlign='start';m.textContent=p.file+' · '+fmtBytes(p.size);info.appendChild(n);info.appendChild(m);
+    var up=(plUpdates||[]).find(function(u){return u.file===p.file;});
+    if(up){var ul=document.createElement('div');ul.className='pl-upd';ul.textContent=T('ui.pl_update_available',{v0:up.current||'?',v1:up.latest,v2:up.source==='hangar'?'Hangar':'Modrinth'});info.appendChild(ul);}
+    row.appendChild(info);
     function mk(t,fn){var x=document.createElement('button');x.className='btn btn-ghost';x.style.cssText='padding:5px 10px;font-size:12px;';x.textContent=t;x.onclick=fn;row.appendChild(x);}
+    if(up){var ub=document.createElement('button');ub.className='btn btn-primary';ub.style.cssText='padding:5px 10px;font-size:12px;';ub.textContent=T('ui.pl_update');ub.onclick=function(){updatePlugins(p.file);};row.appendChild(ub);}
     mk(p.enabled?T('ui.disable'):T('ui.enable'),function(){apiPost('/api/plugins/toggle',{file:p.file}).then(loadPlugins).catch(function(e){toast(e.message,'err');});});
     mk(T('ui.delete_3'),function(){confirm2(T('ui.delete_plugin'),p.file+T('ui.the_file_will_be_deleted_permanently_continu'),async function(){try{await apiPost('/api/plugins/delete',{file:p.file});loadPlugins();}catch(e){toast(e.message,'err');}});});
     box.appendChild(row);});}
 var plPopularLoaded=false;
+var plUpdates=null;
+async function checkPluginUpdates(force){var st=document.getElementById('pl-upd-status'),all=document.getElementById('pl-upd-all');if(!st)return;st.textContent=T('ui.pl_checking');
+  try{var d=await jarGet('/api/plugins/updates'+(force?'?force=1':''));plUpdates=d.updates||[];
+    st.textContent=plUpdates.length?T('ui.pl_updates_found',{v0:plUpdates.length}):T('ui.pl_all_up_to_date');all.style.display=plUpdates.length>1?'':'none';
+    if(plInstalled)renderPlugins(plInstalled);}catch(e){plUpdates=[];st.textContent=e.message;}}
+function updatePlugins(file){var names=file?[file]:(plUpdates||[]).map(function(u){return u.file;});if(!names.length)return;
+  confirm2(T('ui.pl_update_confirm_title'),T('ui.pl_update_confirm_body',{v0:names.join(', ')}),async function(){
+    var st=document.getElementById('pl-upd-status');st.textContent=T('ui.text_3');
+    try{var d=await apiPost('/api/plugins/update',file?{file:file}:{all:true});var ok=d.results.filter(function(r){return r.updated;}),bad=d.results.filter(function(r){return r.error;});
+      toast(ok.length?T('ui.pl_updated_n',{v0:ok.length}):T('ui.pl_nothing_updated'));bad.forEach(function(r){toast(r.file+': '+r.error,'err');});
+      plUpdates=null;await loadPlugins();}catch(e){toast(e.message,'err');st.textContent='';}});}
 function plTab(w){document.getElementById('pl-pane-installed').style.display=w==='installed'?'':'none';document.getElementById('pl-pane-browse').style.display=w==='browse'?'':'none';document.getElementById('pl-tab-installed').classList.toggle('active',w==='installed');document.getElementById('pl-tab-browse').classList.toggle('active',w==='browse');if(w==='browse'&&!plPopularLoaded)searchPlugins();}
 function plSrc(){var e=document.getElementById('pl-src');return e&&e.value==='hangar'?'hangar':'modrinth';}
 function plSrcChanged(){plPopularLoaded=false;searchPlugins();}

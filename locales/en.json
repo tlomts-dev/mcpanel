@@ -892,5 +892,19 @@
  "ui.search_plugins": "Search plugins...",
  "ui.jar_running_other": "running now: {v0}, the new jar applies on the next start",
  "srv.server_was_stopped": "Server was stopped (stopped on purpose, from the panel or with the stop command)",
- "ui.al_any_stop": "Server stopped on purpose (stop button or command)"
+ "ui.al_any_stop": "Server stopped on purpose (stop button or command)",
+ "srv.plugin_update_unknown_source": "This plugin's source is unknown (it was not installed from the panel and Modrinth does not recognise the file)",
+ "srv.plugin_update_busy": "A plugin update is already running",
+ "srv.panel_plugins_updated": "[Panel] Plugins updated: {v0}. Restart the server to load them (old jars kept in .panel-old-plugins)",
+ "ui.pl_check_updates": "Check for updates",
+ "ui.pl_update_all": "Update all",
+ "ui.pl_update": "Update",
+ "ui.pl_checking": "Checking…",
+ "ui.pl_updates_found": "{v0} update(s) available",
+ "ui.pl_all_up_to_date": "All known plugins are up to date",
+ "ui.pl_update_available": "Update available: {v0} → {v1} ({v2})",
+ "ui.pl_update_confirm_title": "Update plugins?",
+ "ui.pl_update_confirm_body": "Replace with the newest compatible version: {v0}. The old jar is kept in .panel-old-plugins. Restart the server afterwards to load the new version.",
+ "ui.pl_updated_n": "{v0} plugin(s) updated. Restart the server to load them.",
+ "ui.pl_nothing_updated": "Nothing to update"
 }

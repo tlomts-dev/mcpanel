@@ -892,5 +892,19 @@
  "ui.search_plugins": "ابحث عن إضافة...",
  "ui.jar_running_other": "يعمل الآن: {v0}، والجار الجديد يُطبَّق عند التشغيل القادم",
  "srv.server_was_stopped": "تم إيقاف السيرفر (إيقاف متعمّد من اللوحة أو بأمر stop)",
- "ui.al_any_stop": "السيرفر أُوقف عمداً (زر الإيقاف أو أمر stop)"
+ "ui.al_any_stop": "السيرفر أُوقف عمداً (زر الإيقاف أو أمر stop)",
+ "srv.plugin_update_unknown_source": "مصدر هذه الإضافة غير معروف (لم تُثبَّت من اللوحة ولا يتعرّف Modrinth على ملفها)",
+ "srv.plugin_update_busy": "تحديث الإضافات جارٍ بالفعل",
+ "srv.panel_plugins_updated": "[Panel] حُدّثت الإضافات: {v0}. أعد تشغيل السيرفر لتحميلها (الملفات القديمة في .panel-old-plugins)",
+ "ui.pl_check_updates": "فحص التحديثات",
+ "ui.pl_update_all": "تحديث الكل",
+ "ui.pl_update": "تحديث",
+ "ui.pl_checking": "جارٍ الفحص…",
+ "ui.pl_updates_found": "يوجد {v0} تحديث",
+ "ui.pl_all_up_to_date": "كل الإضافات المعروفة محدّثة",
+ "ui.pl_update_available": "يوجد تحديث: {v0} ← {v1} ({v2})",
+ "ui.pl_update_confirm_title": "تحديث الإضافات؟",
+ "ui.pl_update_confirm_body": "سيُستبدل بأحدث إصدار متوافق: {v0}. يُحفظ الملف القديم في .panel-old-plugins. أعد تشغيل السيرفر بعدها لتحميل الإصدار الجديد.",
+ "ui.pl_updated_n": "حُدّثت {v0} إضافة. أعد تشغيل السيرفر لتحميلها.",
+ "ui.pl_nothing_updated": "لا يوجد ما يُحدَّث"
 }

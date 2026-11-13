@@ -1410,17 +1410,22 @@ async function pluginMeta(full) {
   } catch { return {}; }
 }
 
-// Where each installed jar came from, so the browse tab can mark a project as installed exactly:
+// Where each installed jar came from, so the browse tab can mark a project as installed exactly and updates can be found:
 // 1) what the panel itself installed (.panel-plugin-sources.json), 2) Modrinth's hash lookup for any other jar.
 const PLUGIN_SOURCES_FILE = path.join(SERVER_DIR, '.panel-plugin-sources.json');
-let pluginSources = {};
+let pluginSources = {};   // jar name (without .disabled) -> { project: "modrinth:<id>"|"hangar:<slug>", version, date }
 try { pluginSources = JSON.parse(fs.readFileSync(PLUGIN_SOURCES_FILE, 'utf8')) || {}; } catch { pluginSources = {}; }
-function notePluginSource(file, source, id) {
-  pluginSources[String(file).replace(/\.disabled$/, '')] = source + ':' + id;
+for (const [k, v] of Object.entries(pluginSources)) if (typeof v === 'string') pluginSources[k] = { project: v };   // 1.3.4 format
+const baseJar = f => String(f).replace(/\.disabled$/, '');
+function notePluginSource(file, source, id, version, date) {
+  pluginSources[baseJar(file)] = { project: source + ':' + id, version: version || '', date: date || 0 };
   try { fs.writeFileSync(PLUGIN_SOURCES_FILE, JSON.stringify(pluginSources)); } catch {}
 }
+function forgetPluginSource(file) {
+  if (pluginSources[baseJar(file)]) { delete pluginSources[baseJar(file)]; try { fs.writeFileSync(PLUGIN_SOURCES_FILE, JSON.stringify(pluginSources)); } catch {} }
+}
 const sha1Cache = new Map();        // "file|size|mtime" -> sha1
-const modrinthIdCache = new Map();  // sha1 -> { id|null, at }
+const modrinthIdCache = new Map();  // sha1 -> { info: { id, version, date } | null, at }
 async function pluginProjects(list) {
   const want = [];
   for (const p of list) {
@@ -1435,32 +1440,105 @@ async function pluginProjects(list) {
   if (want.length) {
     try {
       const found = await downloads.identifyModrinth(want);
-      for (const h of want) modrinthIdCache.set(h, { id: found[h] || null, at: Date.now() });
+      for (const h of want) modrinthIdCache.set(h, { info: found[h] || null, at: Date.now() });
     } catch {}   // offline: fall back to names in the browser
   }
   for (const p of list) {
-    const ids = [];
-    const rec = pluginSources[p.file.replace(/\.disabled$/, '')];
-    if (rec) ids.push(rec);
-    const c = p.sha1 && modrinthIdCache.get(p.sha1);
-    if (c && c.id && !ids.includes('modrinth:' + c.id)) ids.push('modrinth:' + c.id);
+    const ids = [], rec = pluginSources[baseJar(p.file)];
+    if (rec && rec.project) ids.push(rec.project);
+    const c = p.sha1 && modrinthIdCache.get(p.sha1), info = c && c.info;
+    if (info && !ids.includes('modrinth:' + info.id)) ids.push('modrinth:' + info.id);
     p.projects = ids;
+    // what the update check compares against: the panel's own record first, else Modrinth's answer for this exact file
+    p._origin = rec && rec.project ? { project: rec.project, version: rec.version || p.version || '', date: rec.date || 0 }
+      : info ? { project: 'modrinth:' + info.id, version: info.version, date: info.date, sha1: p.sha1 } : null;
     delete p.sha1;
   }
 }
 
+async function listPlugins() {
+  const files = (await fsp.readdir(PLUGINS_DIR)).filter(f => PLUGIN_FILE_RE.test(f)).slice(0, 300);
+  const out = [];
+  for (const f of files) {
+    const full = path.join(PLUGINS_DIR, f), st = await fsp.stat(full);
+    out.push({ file: f, enabled: !f.endsWith('.disabled'), size: st.size, date: st.mtimeMs, ...(await pluginMeta(full)) });
+  }
+  await pluginProjects(out);
+  out.sort((a, b) => (a.name || a.file).toLowerCase().localeCompare((b.name || b.file).toLowerCase()));
+  return out;
+}
+
 app.get('/api/plugins', async (_req, res) => {
   try {
-    const files = (await fsp.readdir(PLUGINS_DIR)).filter(f => PLUGIN_FILE_RE.test(f)).slice(0, 300);
-    const out = [];
-    for (const f of files) {
-      const full = path.join(PLUGINS_DIR, f), st = await fsp.stat(full);
-      out.push({ file: f, enabled: !f.endsWith('.disabled'), size: st.size, date: st.mtimeMs, ...(await pluginMeta(full)) });
-    }
-    await pluginProjects(out);
-    out.sort((a, b) => (a.name || a.file).toLowerCase().localeCompare((b.name || b.file).toLowerCase()));
+    const out = await listPlugins();
+    for (const p of out) delete p._origin;
     res.json({ plugins: out, mcVersion: mcVersionOnly() });
   } catch { res.json({ plugins: [], mcVersion: mcVersionOnly() }); }
+});
+
+// ── Plugin updates: newest compatible version from the same source, only when it is really newer ─────────────
+async function latestFor(origin, mc) {
+  const [src, id] = origin.project.split(/:(.*)/s);
+  const latest = src === 'hangar' ? await downloads.latestHangar(id, mc) : await downloads.latestModrinth(id, mc);
+  const same = origin.sha1 && latest.file.sha1 ? origin.sha1 === latest.file.sha1 : latest.version === origin.version;
+  // never "update" to an older build (for example when a beta newer than the latest release is installed)
+  const newer = !same && (!origin.date || !latest.date || latest.date > origin.date);
+  return { src, id, latest, newer };
+}
+let pluginUpdateCache = { at: 0, list: null };
+app.get('/api/plugins/updates', async (req, res) => {
+  if (req.query.force !== '1' && pluginUpdateCache.list && Date.now() - pluginUpdateCache.at < 15 * 60000) return res.json({ updates: pluginUpdateCache.list, checkedAt: pluginUpdateCache.at });
+  try {
+    const mc = mcVersionOnly(), list = await listPlugins(), updates = [];
+    await Promise.all(list.filter(p => p._origin).map(async p => {
+      try {
+        const r = await latestFor(p._origin, mc);
+        if (r.newer) updates.push({ file: p.file, name: p.name || p.file, source: r.src, current: p._origin.version || p.version || '', latest: r.latest.version });
+      } catch {}   // not compatible any more, project gone, site down: no update offered
+    }));
+    pluginUpdateCache = { at: Date.now(), list: updates };
+    res.json({ updates, checkedAt: pluginUpdateCache.at, checked: list.filter(p => p._origin).length, total: list.length });
+  } catch (e) { res.status(502).json({ error: dlError(e) }); }
+});
+
+let pluginUpdateBusy = false;
+// Replaces one jar with the newest compatible version. The old jar is kept in .panel-old-plugins and put back if the
+// download fails. A disabled plugin stays disabled. The server loads the new jar on its next restart.
+async function updateOnePlugin(file, mc) {
+  const list = await listPlugins(), p = list.find(x => x.file === file);
+  if (!p || !p._origin) throw new Error(t('srv.plugin_update_unknown_source'));
+  const r = await latestFor(p._origin, mc);
+  if (!r.newer) return { file, updated: false };
+  const oldDir = path.join(SERVER_DIR, '.panel-old-plugins');
+  await fsp.mkdir(oldDir, { recursive: true });
+  const kept = path.join(oldDir, file + '.' + Date.now());
+  await fsp.rename(path.join(PLUGINS_DIR, file), kept);
+  let got;
+  try { got = await downloads.fetchPluginFile(r.src, r.latest, PLUGINS_DIR); }
+  catch (e) { await fsp.rename(kept, path.join(PLUGINS_DIR, file)).catch(() => {}); throw e; }
+  let newFile = got.file;
+  if (file.endsWith('.disabled')) { await fsp.rename(path.join(PLUGINS_DIR, newFile), path.join(PLUGINS_DIR, newFile + '.disabled')); newFile += '.disabled'; }
+  if (baseJar(file) !== baseJar(newFile)) forgetPluginSource(file);
+  notePluginSource(newFile, r.src, r.id, r.latest.version, r.latest.date);
+  return { file, newFile, updated: true, from: p._origin.version || p.version || '', to: r.latest.version };
+}
+app.post('/api/plugins/update', async (req, res) => {
+  const b = req.body || {}, mc = mcVersionOnly();
+  const files = b.all === true ? (pluginUpdateCache.list || []).map(u => u.file) : [String(b.file || '')];
+  if (!files.length || files.some(f => !PLUGIN_FILE_RE.test(f))) return res.status(400).json({ error: t('srv.invalid_file_name') });
+  if (pluginUpdateBusy) return res.status(409).json({ error: t('srv.plugin_update_busy') });
+  pluginUpdateBusy = true;
+  const results = [];
+  try {
+    for (const f of files) {
+      try { results.push(await updateOnePlugin(f, mc)); }
+      catch (e) { results.push({ file: f, updated: false, error: dlError(e) }); }
+    }
+  } finally { pluginUpdateBusy = false; }
+  pluginUpdateCache = { at: 0, list: null };
+  const updated = results.filter(r => r.updated);
+  if (updated.length) broadcast({ type: 'log', data: t('srv.panel_plugins_updated', { v0: updated.map(r => r.newFile).join(', ') }) + '\n' });
+  res.json({ success: true, results });
 });
 
 function pluginPath(name) {
@@ -1479,7 +1557,7 @@ app.post('/api/plugins/toggle', async (req, res) => {
 app.post('/api/plugins/delete', async (req, res) => {
   const p = pluginPath((req.body || {}).file);
   if (!p) return res.status(400).json({ error: t('srv.invalid_file_name') });
-  try { await fsp.unlink(p); res.json({ success: true }); }
+  try { await fsp.unlink(p); forgetPluginSource(path.basename(p)); res.json({ success: true }); }
   catch { res.status(404).json({ error: t('srv.file_not_found') }); }
 });
 app.get('/api/plugins/search', async (req, res) => {
@@ -1490,7 +1568,7 @@ app.post('/api/plugins/install', async (req, res) => {
   const b = req.body || {}, src = b.source === 'hangar' ? 'hangar' : 'modrinth';
   try {
     const r = await (src === 'hangar' ? downloads.installHangar : downloads.installPlugin)(b.id, mcVersionOnly(), PLUGINS_DIR);
-    notePluginSource(r.file, src, String(b.id));
+    notePluginSource(r.file, src, String(b.id), r.version, r.date);
     res.json({ success: true, ...r });
   }
   catch (e) { res.status(502).json({ error: dlError(e) }); }

@@ -322,7 +322,8 @@ test('downloads: Modrinth hash lookup identifies installed jars', async () => {
   };
   const d = createDownloads({ fetchImpl: fake });
   const r = await d.identifyModrinth(['a'.repeat(40), 'b'.repeat(40), 'not-a-hash']);
-  assert.deepStrictEqual(r, { ['a'.repeat(40)]: '9eGKb6K1' });        // odd ids are dropped
+  assert.deepStrictEqual(Object.keys(r), ['a'.repeat(40)]);        // odd ids are dropped
+  assert.strictEqual(r['a'.repeat(40)].id, '9eGKb6K1');
   assert.ok(sent.url.endsWith('/version_files') && sent.body.algorithm === 'sha1' && sent.body.hashes.length === 2);
   assert.deepStrictEqual(await d.identifyModrinth([]), {});
 });
