@@ -908,5 +908,17 @@
  "ui.pl_updated_n": "{v0} plugin(s) updated. Restart the server to load them.",
  "ui.pl_nothing_updated": "Nothing to update",
  "srv.invalid_jvm_flags": "Not allowed JVM flags: {v0}. Use plain flags such as -XX:+UseZGC (no spaces, quotes or shell characters; agents and OnError are not allowed).",
- "srv.backup_or_restore_in_progress": "A backup or restore is already running"
+ "srv.backup_or_restore_in_progress": "A backup or restore is already running",
+ "ui.up_title_active": "Uploading {v0} of {v1}",
+ "ui.up_title_done": "Uploaded {v0} of {v1}",
+ "ui.up_waiting": "Waiting",
+ "ui.up_canceled": "Canceled",
+ "ui.up_cancel": "Cancel",
+ "ui.up_all_done": "{v0} file(s) uploaded ✓",
+ "ui.you_do_not_have_permission": "You do not have permission for this",
+ "ui.ph_password": "Password",
+ "ui.ph_directory": "Folder",
+ "ui.ph_search_logs": "Search logs...",
+ "ui.ph_server_command": "Server command... (↑↓ history)",
+ "ui.ph_search_files": "Search files..."
 }

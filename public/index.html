@@ -323,6 +323,26 @@ select.sel:focus{border-color:var(--accent2);}
 .flt-count{font-size:12px;color:var(--muted);align-self:center;}
 .pl-upd-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
 .pl-upd{color:var(--warn);font-size:12px;margin-top:3px;}
+.up-tray{position:fixed;bottom:16px;inset-inline-end:16px;width:340px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px #0006;z-index:450;display:none;}
+.up-tray.show{display:block;}
+.up-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;}
+.up-list{max-height:280px;overflow-y:auto;}
+.up-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--muted2);}
+.up-row:last-child{border-bottom:none;}
+.up-ring-wrap{position:relative;width:38px;height:38px;flex:0 0 auto;}
+.up-ring{width:38px;height:38px;transform:rotate(-90deg);}
+.up-ring-bg{fill:none;stroke:var(--surface2);stroke-width:3.5;}
+.up-ring-fg{fill:none;stroke:var(--accent);stroke-width:3.5;stroke-linecap:round;transition:stroke-dashoffset .25s;}
+.up-err .up-ring-fg,.up-cancel .up-ring-fg{stroke:var(--danger);}
+.up-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text2);}
+.up-ok .up-pct{color:var(--accent);font-size:14px;}
+.up-err .up-pct,.up-cancel .up-pct{color:var(--danger);font-size:13px;}
+.up-info{flex:1;min-width:0;}
+.up-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;text-align:start;}
+.up-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.up-err .up-meta{color:var(--danger);}
+.up-x{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;width:28px;height:28px;cursor:pointer;flex:0 0 auto;}
+.up-x:hover{color:var(--danger);border-color:var(--danger);}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;}
 .quick-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font),sans-serif;transition:.15s;text-align:center;}
 .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -479,8 +499,8 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
     <div class="login-logo">MC // PANEL</div>
     <h1>@@ui.sign_in@@</h1>
     <p>@@ui.minecraft_server_control_panel@@</p>
-    <input type="text" id="un" placeholder="Username" autocomplete="username">
-    <input type="password" id="pw" placeholder="Password" autocomplete="current-password"
+    <input type="text" id="un" placeholder="@@ui.username@@" autocomplete="username">
+    <input type="password" id="pw" placeholder="@@ui.ph_password@@" autocomplete="current-password"
            onkeydown="if(event.key==='Enter')login()">
     <input type="text" id="tfacode" inputmode="numeric" maxlength="6" placeholder="@@ui.two_factor_code_6_digits@@" autocomplete="one-time-code" style="display:none;direction:ltr;" onkeydown="if(event.key==='Enter')login()">
     <button class="btn-login" id="loginBtn" onclick="login()">@@ui.log_in@@</button>
@@ -606,7 +626,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <div class="info-row"><span class="info-key">@@ui.file_2@@</span><span class="info-val" id="info-jar" style="font-size:10px;">—</span></div>
           <div class="info-row"><span class="info-key">PID</span><span class="info-val" id="info-pid">—</span></div>
           <div class="info-row"><span class="info-key">TPS</span><span class="info-val" id="info-tps">—</span></div>
-          <div class="info-row"><span class="info-key">Directory</span><span class="info-val" id="info-dir" style="font-size:10px;">—</span></div></div>
+          <div class="info-row"><span class="info-key">@@ui.ph_directory@@</span><span class="info-val" id="info-dir" style="font-size:10px;">—</span></div></div>
           </details>
           <details class="dash-det">
             <summary>@@ui.quick_commands@@</summary>
@@ -650,7 +670,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
       <div class="card">
         <div class="console-toolbar">
           <div class="console-search">
-            <input type="text" id="log-search" placeholder="Search logs..." oninput="filterLog()">
+            <input type="text" id="log-search" placeholder="@@ui.ph_search_logs@@" oninput="filterLog()">
             <button class="search-clear" onclick="clearSearch()" title="@@ui.clear@@">✕</button>
           </div>
           <div class="log-counters">
@@ -673,7 +693,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
           <button class="scroll-to-bottom" id="scroll-btn" onclick="jumpToBottom()">@@ui.jump_to_bottom@@</button>
         </div>
         <div class="cmd-row" id="cmd-row">
-          <input type="text" id="cmdinput" placeholder="Server command... (↑↓ history)" maxlength="256" onkeydown="handleCmdKey(event)">
+          <input type="text" id="cmdinput" placeholder="@@ui.ph_server_command@@" maxlength="256" onkeydown="handleCmdKey(event)">
           <button id="cmdBtn" onclick="sendCmd()">@@ui.send@@</button>
         </div>
         <div class="cmd-hints" id="cmd-hints">
@@ -846,7 +866,7 @@ html[dir=ltr] .toggle input:checked+.toggle-slider::before{left:auto;right:3px;}
         </div>
         <div class="breadcrumb" id="file-breadcrumb"></div>
         <div class="file-toolbar">
-          <input class="inp" id="file-search" placeholder="Search files..." oninput="filterFiles()" style="max-width:220px;">
+          <input class="inp" id="file-search" placeholder="@@ui.ph_search_files@@" oninput="filterFiles()" style="max-width:220px;">
           <button class="btn btn-primary" onclick="document.getElementById('file-upload-input').click()">@@ui.upload_file@@</button>
           <input type="file" id="file-upload-input" style="display:none" multiple onchange="handleFileUpload(event)">
         </div>
@@ -1722,15 +1742,43 @@ function deleteFile(relPath,name){confirm2(T('ui.delete_file'),T('ui.delete_2')+
 function downloadFile(relPath,name){var a=document.createElement('a');a.href='/api/files/download?path='+encodeURIComponent(relPath);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);toast(T('ui.downloading')+name);}
 function fileGoUp(){var parts=currentFilePath.split('/').filter(Boolean);parts.pop();loadFiles(parts.join('/'));}
 function fileRefresh(){loadFiles(currentFilePath);}
-async function uploadOneFile(file){
-  try{
-    var buf=await file.arrayBuffer();
-    var r=await fetch('/api/files/upload',{method:'POST',headers:{'x-path':encodeURIComponent(currentFilePath),'x-filename':encodeURIComponent(file.name),'Content-Type':'application/octet-stream'},body:buf});
-    if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.error||T('ui.upload_failed'));}
-    toast(T('ui.uploaded')+file.name+' ✓');
-  }catch(e){toast(e.message,'err');}
-}
-async function handleFileUpload(ev){var files=ev.target.files;if(!files||!files.length)return;for(var i=0;i<files.length;i++){await uploadOneFile(files[i]);}ev.target.value='';loadFiles(currentFilePath);}
+// ── Uploads: a tray in the corner shows every file with a progress ring, percent, size, speed and a cancel button.
+// Files go one after another through XMLHttpRequest (fetch has no upload progress) and are streamed, not read into memory.
+var upItems=[],upBusy=false,upHideTimer=null;
+function upTray(){var t=document.getElementById('up-tray');if(t)return t;t=document.createElement('div');t.id='up-tray';t.className='up-tray';
+  t.innerHTML='<div class="up-head"><span id="up-title"></span><button class="up-x" id="up-close" title="'+esc(T('ui.close'))+'">✕</button></div><div class="up-list" id="up-list"></div>';
+  document.body.appendChild(t);document.getElementById('up-close').onclick=function(){if(!upItems.some(function(i){return i.state==='up'||i.state==='wait';})){t.classList.remove('show');upItems=[];renderUps();}};return t;}
+function fmtSpeed(bps){return bps>0?fmtBytes(bps)+'/s':'';}
+function upRing(pct){var c=2*Math.PI*15,off=c*(1-Math.max(0,Math.min(1,pct)));return '<svg class="up-ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="up-ring-bg"/><circle cx="18" cy="18" r="15" class="up-ring-fg" stroke-dasharray="'+c.toFixed(2)+'" stroke-dashoffset="'+off.toFixed(2)+'"/></svg>';}
+function renderUps(){var list=document.getElementById('up-list');if(!list)return;list.textContent='';
+  var done=upItems.filter(function(i){return i.state==='ok';}).length,active=upItems.filter(function(i){return i.state==='up'||i.state==='wait';}).length;
+  document.getElementById('up-title').textContent=active?T('ui.up_title_active',{v0:done+1,v1:upItems.length}):T('ui.up_title_done',{v0:done,v1:upItems.length});
+  upItems.forEach(function(it){var row=document.createElement('div');row.className='up-row up-'+it.state;
+    var pct=it.size?it.loaded/it.size:0,label=it.state==='up'?Math.floor(pct*100)+'%':it.state==='ok'?'✓':it.state==='err'||it.state==='cancel'?'✕':'…';
+    var ring=document.createElement('div');ring.className='up-ring-wrap';ring.innerHTML=upRing(it.state==='ok'?1:pct)+'<span class="up-pct">'+label+'</span>';row.appendChild(ring);
+    var info=document.createElement('div');info.className='up-info';var n=document.createElement('div');n.className='up-name';n.textContent=it.file.name;n.title=it.file.name;
+    var m=document.createElement('div');m.className='up-meta';
+    m.textContent=it.state==='up'?fmtBytes(it.loaded)+' / '+fmtBytes(it.size)+(it.speed?' · '+fmtSpeed(it.speed):''):it.state==='wait'?T('ui.up_waiting')+' · '+fmtBytes(it.size):it.state==='ok'?fmtBytes(it.size):it.state==='cancel'?T('ui.up_canceled'):(it.error||T('ui.upload_failed'));
+    info.appendChild(n);info.appendChild(m);row.appendChild(info);
+    if(it.state==='up'||it.state==='wait'){var x=document.createElement('button');x.className='up-x';x.textContent='✕';x.title=T('ui.up_cancel');x.onclick=function(){if(it.xhr)it.xhr.abort();else{it.state='cancel';renderUps();}};row.appendChild(x);}
+    list.appendChild(row);});}
+function uploadFiles(files){if(!files||!files.length)return;var t=upTray();clearTimeout(upHideTimer);
+  if(!upItems.some(function(i){return i.state==='up'||i.state==='wait';}))upItems=[];
+  for(var i=0;i<files.length;i++)upItems.push({file:files[i],dir:currentFilePath,size:files[i].size||0,loaded:0,state:'wait'});
+  t.classList.add('show');renderUps();upPump();}
+function upPump(){if(upBusy)return;var it=upItems.find(function(i){return i.state==='wait';});
+  if(!it){var ok=upItems.filter(function(i){return i.state==='ok';}).length;if(ok)toast(T('ui.up_all_done',{v0:ok}));
+    if(!upItems.some(function(i){return i.state==='err';}))upHideTimer=setTimeout(function(){var t=document.getElementById('up-tray');if(t)t.classList.remove('show');},5000);return;}
+  upBusy=true;it.state='up';var x=new XMLHttpRequest();it.xhr=x;var t0=Date.now(),lastT=t0,lastB=0;
+  x.open('POST','/api/files/upload');x.setRequestHeader('x-path',encodeURIComponent(it.dir));x.setRequestHeader('x-filename',encodeURIComponent(it.file.name));x.setRequestHeader('Content-Type','application/octet-stream');
+  x.upload.onprogress=function(e){if(!e.lengthComputable)return;it.loaded=e.loaded;it.size=e.total||it.size;var now=Date.now();if(now-lastT>=500){it.speed=(e.loaded-lastB)*1000/(now-lastT);lastT=now;lastB=e.loaded;}renderUps();};
+  var end=function(){it.xhr=null;upBusy=false;if(it.dir===currentFilePath)loadFiles(currentFilePath);renderUps();upPump();};
+  x.onload=function(){if(x.status>=200&&x.status<300){it.state='ok';it.loaded=it.size;}else{it.state='err';try{it.error=JSON.parse(x.responseText).error;}catch(e){it.error=T('ui.upload_failed');}toast(it.file.name+': '+it.error,'err');}end();};
+  x.onerror=function(){it.state='err';it.error=T('ui.upload_failed');toast(it.file.name+': '+it.error,'err');end();};
+  x.onabort=function(){it.state='cancel';end();};
+  renderUps();x.send(it.file);}
+window.addEventListener('beforeunload',function(e){if(upItems.some(function(i){return i.state==='up'||i.state==='wait';})){e.preventDefault();e.returnValue='';}});
+function handleFileUpload(ev){var files=ev.target.files;if(!files||!files.length)return;uploadFiles(Array.prototype.slice.call(files));ev.target.value='';}
 
 // ════════════ BACKUPS ════════════
 async function loadBackups(){try{var d=await fetch('/api/backups').then(function(r){return r.json();});backups=d.backups||[];renderBackups();}catch(e){}}
@@ -2338,7 +2386,7 @@ function toggleTheme(){
 (function(){var dz=document.getElementById('drop-zone');if(!dz)return;
   ['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='var(--accent)';});});
   ['dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='transparent';});});
-  dz.addEventListener('drop',async function(e){var files=e.dataTransfer.files;if(!files||!files.length)return;for(var i=0;i<files.length;i++){await uploadOneFile(files[i]);}loadFiles(currentFilePath);});
+  dz.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(!files||!files.length)return;if(!can('files.edit')){toast(T('ui.you_do_not_have_permission'),'err');return;}uploadFiles(Array.prototype.slice.call(files));});
 })();
 </script>
 </body>

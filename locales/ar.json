@@ -908,5 +908,17 @@
  "ui.pl_updated_n": "حُدّثت {v0} إضافة. أعد تشغيل السيرفر لتحميلها.",
  "ui.pl_nothing_updated": "لا يوجد ما يُحدَّث",
  "srv.invalid_jvm_flags": "معاملات JVM غير مسموحة: {v0}. استخدم معاملات بسيطة مثل -XX:+UseZGC (بلا مسافات أو علامات اقتباس أو رموز shell، ولا يُسمح بـ agent وOnError).",
- "srv.backup_or_restore_in_progress": "نسخ احتياطي أو استرجاع جارٍ بالفعل"
+ "srv.backup_or_restore_in_progress": "نسخ احتياطي أو استرجاع جارٍ بالفعل",
+ "ui.up_title_active": "جارٍ رفع {v0} من {v1}",
+ "ui.up_title_done": "رُفع {v0} من {v1}",
+ "ui.up_waiting": "في الانتظار",
+ "ui.up_canceled": "أُلغي",
+ "ui.up_cancel": "إلغاء",
+ "ui.up_all_done": "رُفع {v0} ملف ✓",
+ "ui.you_do_not_have_permission": "ليست لديك صلاحية لهذا",
+ "ui.ph_password": "كلمة المرور",
+ "ui.ph_directory": "المجلد",
+ "ui.ph_search_logs": "ابحث في السجل...",
+ "ui.ph_server_command": "أمر للسيرفر... (↑↓ السجل)",
+ "ui.ph_search_files": "ابحث في الملفات..."
 }
